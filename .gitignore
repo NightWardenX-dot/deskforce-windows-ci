@@ -1,0 +1,12 @@
+*.exe
+*.zip
+*.apk
+*.msi
+oem/oem.env
+oem/rustdesk-src/
+oem/dist/
+oem/downloads/
+oem/.rdgen-*/
+__pycache__/
+*.pyc
+.DS_Store

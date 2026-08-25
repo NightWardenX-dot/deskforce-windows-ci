@@ -1,0 +1,250 @@
+name: DeskForce Windows Flutter (paper/brass)
+
+# Full branded client with site paper/brass theme (not RDGen).
+on:
+  workflow_dispatch:
+
+env:
+  RUST_VERSION: "1.75"
+  LLVM_VERSION: "15.0.6"
+  FLUTTER_VERSION: "3.24.5"
+  VCPKG_COMMIT_ID: "120deac3062162151622ca4860575a33844ba10b"
+  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+  OEM_APP_NAME: DeskForce
+  OEM_APP_VERSION: "1.2.0-beta.1"
+  OEM_ID_SERVER: "78.29.49.98"
+  OEM_RELAY_SERVER: "78.29.49.98"
+  OEM_API_SERVER: "https://deskforce.dr6ter.ru"
+  OEM_KEY_PUB: "ERushCbh73QS5YNPuOvqK5M3Yx9v9z+8Ft5O+iAQevg="
+  RUSTDESK_TAG: "1.4.6"
+
+jobs:
+  build-windows:
+    runs-on: windows-2022
+    timeout-minutes: 240
+    steps:
+      - name: Checkout DeskForce (OEM branding)
+        uses: actions/checkout@v4
+        with:
+          path: deskforce
+
+      - name: Clone RustDesk ${{ env.RUSTDESK_TAG }}
+        shell: bash
+        run: |
+          git clone --depth 1 --branch "${{ env.RUSTDESK_TAG }}" \
+            https://github.com/rustdesk/rustdesk.git rustdesk
+          cd rustdesk
+          git submodule update --init --recursive --depth 1 || git submodule update --init --recursive
+
+      - name: Apply DeskForce branding (paper/brass + UI cuts)
+        shell: bash
+        env:
+          PYTHONUTF8: "1"
+          PYTHONIOENCODING: utf-8
+        run: |
+          export RUSTDESK_SRC="$GITHUB_WORKSPACE/rustdesk"
+          export OEM_APP_NAME OEM_APP_VERSION OEM_ID_SERVER OEM_RELAY_SERVER OEM_API_SERVER OEM_KEY_PUB
+          RUSTDESK_SRC="$GITHUB_WORKSPACE/rustdesk" python3 deskforce/oem/apply_branding.py
+          test -f rustdesk/flutter/assets/icon.png || cp -f deskforce/oem/branding/app_icon.png rustdesk/flutter/assets/icon.png
+          grep -n "B8892A\|DeskForce\|apply_deskforce_oem" \
+            rustdesk/flutter/lib/common.dart rustdesk/src/common.rs | head -20 || true
+          # Fail if brand colors missing
+          grep -q "B8892A" rustdesk/flutter/lib/common.dart
+          grep -q "apply_deskforce_oem" rustdesk/src/common.rs
+          grep -q "DeskForce" rustdesk/libs/hbb_common/src/config.rs
+          grep -q "Подключить устройство" rustdesk/flutter/lib/desktop/pages/connection_page.dart
+          grep -q "_DeskForcePaperGridPainter" rustdesk/flutter/lib/desktop/pages/desktop_home_page.dart
+          test -f rustdesk/flutter/assets/icon.png
+          test -f rustdesk/flutter/assets/logo.png
+          test -f rustdesk/flutter/assets/icon.ico
+          test -f rustdesk/flutter/windows/runner/resources/app_icon.ico
+          # No third-party About leftovers
+          ! grep -q "Purslane" rustdesk/flutter/windows/runner/Runner.rc
+          ! grep -q "Purslane" rustdesk/flutter/lib/desktop/pages/deskforce_settings_page.dart
+          ! grep -q "rustdesk.com" rustdesk/flutter/lib/desktop/pages/deskforce_settings_page.dart
+          grep -q "Настройки" rustdesk/flutter/lib/desktop/pages/deskforce_settings_page.dart
+          # Stock RustDesk SVG must be replaced with DeskForce mark
+          ! grep -q "#0071ff" rustdesk/flutter/assets/icon.svg
+          grep -q "#b8892a" rustdesk/flutter/assets/icon.svg
+          # Unambiguous full-height D (reject legacy mid-height P bowl path)
+          ! grep -q "h115.2c65.6" rustdesk/flutter/assets/icon.svg
+          grep -q "fill-rule=\"evenodd\"" rustdesk/flutter/assets/icon.svg || grep -q 'fill-rule="evenodd"' rustdesk/flutter/assets/icon.svg
+          grep -q "M 96 80" rustdesk/flutter/assets/icon.svg
+          # Multi-size ICO must include explicit 16 and 24 mipmaps (Explorer zoom)
+          python3 -c 'import struct,pathlib; b=pathlib.Path("deskforce/oem/branding/app_icon.ico").read_bytes(); n=struct.unpack_from("<H",b,4)[0]; s={256 if (w:=struct.unpack_from("<BB",b,6+i*16)[0])==0 else w for i in range(n)}; need={16,24,32,48,64,128,256}; assert not (need-s), (sorted(need-s),sorted(s)); print("app_icon.ico sizes OK",sorted(s))'
+
+          grep -q "deskforce" rustdesk/libs/portable/src/main.rs
+
+          grep -q 'version = "1.2.0-beta.1"' rustdesk/Cargo.toml
+          grep -q 'webview_windows' rustdesk/flutter/pubspec.yaml
+          grep -q '78.29.49.98' rustdesk/libs/hbb_common/src/config.rs
+          ! grep -q 'rs-ny.rustdesk.com' rustdesk/libs/hbb_common/src/config.rs
+          ! grep -q 'admin.rustdesk.com' rustdesk/src/common.rs
+          test -f rustdesk/flutter/lib/desktop/pages/cabinet_webview_page.dart
+
+          test -f rustdesk/flutter/lib/desktop/pages/deskforce_settings_page.dart
+          test -f rustdesk/flutter/lib/common/deskforce_startup.dart
+          grep -q "dfApplyStartupWindowBehavior" rustdesk/flutter/lib/main.dart
+          grep -q "Автозапуск" rustdesk/flutter/lib/desktop/pages/deskforce_settings_page.dart
+          grep -q "Полноэкранный режим при запуске" rustdesk/flutter/lib/desktop/pages/deskforce_settings_page.dart
+          grep -q "Проверить обновления" rustdesk/flutter/lib/desktop/pages/deskforce_settings_page.dart
+          # No RustDesk left-nav settings chrome
+          ! grep -q "_nav()" rustdesk/flutter/lib/desktop/pages/deskforce_settings_page.dart
+          grep -q "hide-help-cards" rustdesk/src/common.rs
+          grep -q "disable-installation" rustdesk/src/common.rs
+          grep -q "df-start-fullscreen" rustdesk/src/common.rs
+          # Stopped-service UI must not show stock install cards
+          grep -q "return const SizedBox.shrink();" rustdesk/flutter/lib/desktop/pages/desktop_home_page.dart
+          grep -q "Онлайн" rustdesk/flutter/lib/desktop/pages/connection_page.dart
+          grep -q "Офлайн" rustdesk/flutter/lib/desktop/pages/connection_page.dart
+          # No overlay autocomplete / stock peers pane (caused solid gray void under Connect)
+          ! grep -q "RawAutocomplete" rustdesk/flutter/lib/desktop/pages/connection_page.dart
+          ! grep -q "PeerTabPage" rustdesk/flutter/lib/desktop/pages/connection_page.dart
+          grep -q "НЕДАВНИЕ" rustdesk/flutter/lib/desktop/pages/connection_page.dart
+          grep -q "0xFFE8E2D4" rustdesk/flutter/lib/desktop/pages/connection_page.dart
+          test -f rustdesk/flutter/lib/common/deskforce_update.dart
+          grep -q "dfCheckUpdateOnStartup" rustdesk/flutter/lib/desktop/pages/desktop_home_page.dart
+          grep -q "Доступно обновление" rustdesk/flutter/lib/common/deskforce_update.dart
+          grep -q "deskforce.dr6ter.ru" rustdesk/flutter/lib/common/deskforce_update.dart
+          ! grep -qiE 'https?://[^\"[:space:]]*rustdesk\.com' rustdesk/flutter/lib/common/deskforce_update.dart
+
+      - name: Install LLVM
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: ${{ env.LLVM_VERSION }}
+
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          targets: x86_64-pc-windows-msvc
+          components: rustfmt, clippy
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: rustdesk -> target
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          architecture: x64
+          cache: true
+
+      - name: Enable Windows desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Install flutter_rust_bridge
+        shell: bash
+        run: |
+          cargo install cargo-expand --locked || true
+          cargo install flutter_rust_bridge_codegen --version 1.80.1 --features "uuid" --locked \
+            || cargo install flutter_rust_bridge_codegen --features "uuid" --locked
+
+      - name: Generate FFI bridge
+        working-directory: rustdesk
+        shell: bash
+        run: |
+          rustup component add rustfmt --toolchain ${{ env.RUST_VERSION }}-x86_64-pc-windows-msvc || rustup component add rustfmt
+          # Keep pubspec as in RustDesk 1.4.6 — do NOT downgrade extended_text for Flutter 3.24.5
+          flutter --version
+          pushd flutter && flutter pub get && popd
+          flutter_rust_bridge_codegen \
+            --rust-input ./src/flutter_ffi.rs \
+            --dart-output ./flutter/lib/generated_bridge.dart \
+            --c-output ./flutter/windows/runner/bridge_generated.h
+          mkdir -p flutter/macos/Runner flutter/ios/Runner
+          cp -f flutter/windows/runner/bridge_generated.h flutter/macos/Runner/bridge_generated.h || true
+          cp -f flutter/windows/runner/bridge_generated.h flutter/ios/Runner/bridge_generated.h || true
+          test -f flutter/lib/generated_bridge.dart
+          test -f src/bridge_generated.rs
+
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgDirectory: C:\vcpkg
+          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
+
+      - name: Install vcpkg dependencies
+        shell: bash
+        working-directory: rustdesk
+        env:
+          VCPKG_DEFAULT_HOST_TRIPLET: x64-windows-static
+          VCPKG_ROOT: C:/vcpkg
+        run: |
+          $VCPKG_ROOT/vcpkg install --triplet x64-windows-static --x-install-root="$VCPKG_ROOT/installed" \
+            || true
+
+      - name: Build DeskForce Windows
+        working-directory: rustdesk
+        shell: bash
+        env:
+          VCPKG_ROOT: C:/vcpkg
+        run: |
+          python3 ./build.py --portable --hwcodec --flutter --vram --skip-portable-pack
+
+      - name: Pack single DeskForce.exe (portable)
+        shell: bash
+        working-directory: rustdesk
+        run: |
+          set -e
+          RELEASE="flutter/build/windows/x64/runner/Release"
+          test -f "$RELEASE/rustdesk.exe"
+          rm -rf deskforce-pack
+          mkdir -p deskforce-pack
+          cp -a "$RELEASE/." deskforce-pack/
+          mv -f deskforce-pack/rustdesk.exe deskforce-pack/DeskForce.exe
+          curl -fsSL -o usbmmidd_v2.zip \
+            https://github.com/rustdesk-org/rdev/releases/download/usbmmidd_v2/usbmmidd_v2.zip || true
+          if [[ -f usbmmidd_v2.zip ]]; then
+            powershell.exe -NoProfile -Command "Expand-Archive -Path usbmmidd_v2.zip -DestinationPath . -Force" || true
+            cp -a usbmmidd_v2 deskforce-pack/ 2>/dev/null || true
+          fi
+          runner_res=$(find . -name 'Runner.res' 2>/dev/null | head -n 1 || true)
+          if [[ -n "$runner_res" ]]; then
+            cp -f "$runner_res" libs/portable/Runner.res || true
+          fi
+          sed -i 's/ProductName = "RustDesk"/ProductName = "DeskForce"/' libs/portable/Cargo.toml || true
+          sed -i 's/FileDescription = "RustDesk Remote Desktop"/FileDescription = "DeskForce Remote Desktop"/' libs/portable/Cargo.toml || true
+          sed -i 's/OriginalFilename = "rustdesk.exe"/OriginalFilename = "DeskForce.exe"/' libs/portable/Cargo.toml || true
+          sed -i 's/LegalCopyright = "Copyright © 2025 Purslane Ltd. All rights reserved."/LegalCopyright = "Copyright © 2026 DeskForce. All rights reserved."/' libs/portable/Cargo.toml || true
+          sed -i 's/description = "RustDesk Remote Desktop"/description = "DeskForce Remote Desktop"/' libs/portable/Cargo.toml || true
+          # Ensure flutter assets icon.ico travels with the pack (window icon)
+          if [[ -f flutter/assets/icon.ico ]]; then
+            mkdir -p deskforce-pack/data/flutter_assets/assets
+            cp -f flutter/assets/icon.ico deskforce-pack/data/flutter_assets/assets/icon.ico || true
+          fi
+          pushd libs/portable
+          pip3 install -r requirements.txt
+          # generate.py writes data.bin then cargo-builds; ignore its exit (os.system)
+          python3 ./generate.py -f ../../deskforce-pack/ -o . -e ../../deskforce-pack/DeskForce.exe || true
+          test -f data.bin
+          popd
+          # Always rebuild packer from workspace root (embeds data.bin)
+          cargo build --release -p rustdesk-portable-packer
+          PACKER="target/release/rustdesk-portable-packer.exe"
+          if [[ ! -f "$PACKER" ]]; then
+            PACKER="libs/portable/target/release/rustdesk-portable-packer.exe"
+          fi
+          echo "PACKER=$PACKER"
+          ls -lh "$PACKER"
+          mkdir -p ../out
+          # Windows: never rm a folder named like the .exe beside it
+          rm -rf ../out/DeskForce-bundle ../out/DeskForce.exe ../out/DeskForce-Windows-paper-brass.zip
+          mkdir -p ../out/DeskForce-bundle
+          cp -a deskforce-pack/. ../out/DeskForce-bundle/
+          (cd ../out && powershell.exe -NoProfile -Command "Compress-Archive -Path 'DeskForce-bundle\\*' -DestinationPath 'DeskForce-Windows-paper-brass.zip' -Force")
+          cp -f "$PACKER" ../out/DeskForce.exe
+          ls -lh ../out/DeskForce.exe ../out/DeskForce-Windows-paper-brass.zip
+          rm -rf ../out/DeskForce-bundle
+          # sanity: single-file portable must be much larger than bare Flutter runner
+          SIZE=$(wc -c < ../out/DeskForce.exe)
+          echo "DeskForce.exe bytes=$SIZE"
+          test "$SIZE" -gt 10000000
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DeskForce-Windows-paper-brass
+          path: |
+            out/DeskForce.exe
+            out/DeskForce-Windows-paper-brass.zip
+          if-no-files-found: error

@@ -1,0 +1,25 @@
+diff --git a/src/config.rs b/src/config.rs
+index 31811d4..02c76de 100644
+--- a/src/config.rs
++++ b/src/config.rs
+@@ -56,9 +56,9 @@ lazy_static::lazy_static! {
+     static ref STATUS: RwLock<Status> = RwLock::new(Status::load());
+     static ref TRUSTED_DEVICES: RwLock<(Vec<TrustedDevice>, bool)> = Default::default();
+     static ref ONLINE: Mutex<HashMap<String, i64>> = Default::default();
+-    pub static ref PROD_RENDEZVOUS_SERVER: RwLock<String> = RwLock::new("".to_owned());
++    pub static ref PROD_RENDEZVOUS_SERVER: RwLock<String> = RwLock::new("78.29.49.98".to_owned());
+     pub static ref EXE_RENDEZVOUS_SERVER: RwLock<String> = Default::default();
+-    pub static ref APP_NAME: RwLock<String> = RwLock::new("RustDesk".to_owned());
++    pub static ref APP_NAME: RwLock<String> = RwLock::new("DeskForce".to_owned());
+     static ref KEY_PAIR: Mutex<Option<KeyPair>> = Default::default();
+     static ref USER_DEFAULT_CONFIG: RwLock<(UserDefaultConfig, Instant)> = RwLock::new((UserDefaultConfig::load(), Instant::now()));
+     pub static ref NEW_STORED_PEER_CONFIG: Mutex<HashSet<String>> = Default::default();
+@@ -107,7 +107,7 @@ const CHARS: &[char] = &[
+ ];
+ 
+ pub const RENDEZVOUS_SERVERS: &[&str] = &["rs-ny.rustdesk.com"];
+-pub const RS_PUB_KEY: &str = "OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGqrQCsWqmBw=";
++pub const RS_PUB_KEY: &str = "ERushCbh73QS5YNPuOvqK5M3Yx9v9z+8Ft5O+iAQevg=";
+ 
+ pub const RENDEZVOUS_PORT: i32 = 21116;
+ pub const RELAY_PORT: i32 = 21117;

@@ -1,0 +1,562 @@
+diff --git a/flutter/android/app/src/main/AndroidManifest.xml b/flutter/android/app/src/main/AndroidManifest.xml
+index f4788af..e3932f4 100644
+--- a/flutter/android/app/src/main/AndroidManifest.xml
++++ b/flutter/android/app/src/main/AndroidManifest.xml
+@@ -25,7 +25,7 @@
+     <application
+         android:name=".MainApplication"
+         android:icon="@mipmap/ic_launcher"
+-        android:label="RustDesk"
++        android:label="DeskForce"
+         android:requestLegacyExternalStorage="true"
+         android:roundIcon="@mipmap/ic_launcher"
+         android:supportsRtl="true">
+@@ -46,7 +46,7 @@
+             android:name=".InputService"
+             android:enabled="true"
+             android:exported="false"
+-            android:label="RustDesk Input"
++            android:label="DeskForce Input"
+             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+             <intent-filter>
+                 <action android:name="android.accessibilityservice.AccessibilityService" />
+diff --git a/flutter/android/app/src/main/res/values/strings.xml b/flutter/android/app/src/main/res/values/strings.xml
+index 3e058a8..56b83ec 100644
+--- a/flutter/android/app/src/main/res/values/strings.xml
++++ b/flutter/android/app/src/main/res/values/strings.xml
+@@ -1,4 +1,4 @@
+ <resources>
+-    <string name="app_name">RustDesk</string>
+-    <string name="accessibility_service_description">Allow other devices to control your phone using virtual touch, when RustDesk screen sharing is established</string>
++    <string name="app_name">DeskForce</string>
++    <string name="accessibility_service_description">Allow other devices to control your phone using virtual touch, when DeskForce screen sharing is established</string>
+ </resources>
+diff --git a/flutter/lib/common.dart b/flutter/lib/common.dart
+index af87f98..8494876 100644
+--- a/flutter/lib/common.dart
++++ b/flutter/lib/common.dart
+@@ -169,31 +169,33 @@ class ColorThemeExtension extends ThemeExtension<ColorThemeExtension> {
+   final Color? divider;
+ 
+   static final light = ColorThemeExtension(
+-    border: Color(0xFFCCCCCC),
+-    border2: Color(0xFFBBBBBB),
+-    border3: Colors.black26,
+-    highlight: Color(0xFFE5E5E5),
+-    drag_indicator: Colors.grey[800],
+-    shadow: Colors.black,
++    // DeskForce paper
++    border: Color(0x3812161C),
++    border2: Color(0xFF8F6A1C),
++    border3: Color(0x1F12161C),
++    highlight: Color(0xFFE8E2D4),
++    drag_indicator: Color(0xFF4A5563),
++    shadow: Color(0xFF12161C),
+     errorBannerBg: Color(0xFFFDEEEB),
+-    me: Colors.green,
+-    toastBg: Colors.black.withOpacity(0.6),
+-    toastText: Colors.white,
+-    divider: Colors.black38,
++    me: Color(0xFF2F6B4F),
++    toastBg: Color(0xCC12161C),
++    toastText: Color(0xFFF3EFE6),
++    divider: Color(0x3812161C),
+   );
+ 
+   static final dark = ColorThemeExtension(
+-    border: Color(0xFF555555),
+-    border2: Color(0xFFE5E5E5),
+-    border3: Colors.white24,
+-    highlight: Color(0xFF3F3F3F),
+-    drag_indicator: Colors.grey,
+-    shadow: Colors.grey,
++    // DeskForce: keep brass accents even if dark forced
++    border: Color(0xFF3A3428),
++    border2: Color(0xFFB8892A),
++    border3: Color(0x33F3EFE6),
++    highlight: Color(0xFF2A261C),
++    drag_indicator: Color(0xFFB8892A),
++    shadow: Colors.black,
+     errorBannerBg: Color(0xFF470F2D),
+-    me: Colors.greenAccent,
+-    toastBg: Colors.white.withOpacity(0.6),
+-    toastText: Colors.black,
+-    divider: Colors.white38,
++    me: Color(0xFF2F6B4F),
++    toastBg: Color(0xCCF3EFE6),
++    toastText: Color(0xFF12161C),
++    divider: Color(0x33F3EFE6),
+   );
+ 
+   @override
+@@ -250,18 +252,19 @@ class ColorThemeExtension extends ThemeExtension<ColorThemeExtension> {
+ class MyTheme {
+   MyTheme._();
+ 
+-  static const Color grayBg = Color(0xFFEFEFF2);
+-  static const Color accent = Color(0xFF0071FF);
+-  static const Color accent50 = Color(0x770071FF);
+-  static const Color accent80 = Color(0xAA0071FF);
+-  static const Color canvasColor = Color(0xFF212121);
+-  static const Color border = Color(0xFFCCCCCC);
+-  static const Color idColor = Color(0xFF00B6F0);
+-  static const Color darkGray = Color.fromARGB(255, 148, 148, 148);
+-  static const Color cmIdColor = Color(0xFF21790B);
+-  static const Color dark = Colors.black87;
+-  static const Color button = Color(0xFF2C8CFF);
+-  static const Color hoverBorder = Color(0xFF999999);
++  // DeskForce УД — site tokens (paper / brass / ink)
++  static const Color grayBg = Color(0xFFE8E2D4);
++  static const Color accent = Color(0xFFB8892A);
++  static const Color accent50 = Color(0x77B8892A);
++  static const Color accent80 = Color(0xAAB8892A);
++  static const Color canvasColor = Color(0xFFF3EFE6);
++  static const Color border = Color(0x1F12161C);
++  static const Color idColor = Color(0xFF8F6A1C);
++  static const Color darkGray = Color(0xFF4A5563);
++  static const Color cmIdColor = Color(0xFF2F6B4F);
++  static const Color dark = Color(0xFF12161C);
++  static const Color button = Color(0xFFB8892A);
++  static const Color hoverBorder = Color(0xFF8F6A1C);
+ 
+   // ListTile
+   static const ListTileThemeData listTileTheme = ListTileThemeData(
+@@ -372,12 +375,12 @@ class MyTheme {
+   );
+ 
+   static ThemeData lightTheme = ThemeData(
+-    // https://stackoverflow.com/questions/77537315/after-upgrading-to-flutter-3-16-the-app-bar-background-color-button-size-and
++    // DeskForce: paper/brass light theme (site.css)
+     useMaterial3: false,
+     brightness: Brightness.light,
+-    hoverColor: Color.fromARGB(255, 224, 224, 224),
+-    scaffoldBackgroundColor: Colors.white,
+-    dialogBackgroundColor: Colors.white,
++    hoverColor: Color(0xFFE8E2D4),
++    scaffoldBackgroundColor: Color(0xFFF3EFE6),
++    dialogBackgroundColor: Color(0xFFF3EFE6),
+     appBarTheme: AppBarTheme(
+       shadowColor: Colors.transparent,
+     ),
+@@ -403,17 +406,17 @@ class MyTheme {
+           )
+         : null,
+     textTheme: const TextTheme(
+-        titleLarge: TextStyle(fontSize: 19, color: Colors.black87),
+-        titleSmall: TextStyle(fontSize: 14, color: Colors.black87),
+-        bodySmall: TextStyle(fontSize: 12, color: Colors.black87, height: 1.25),
++        titleLarge: TextStyle(fontSize: 19, color: Color(0xFF12161C)),
++        titleSmall: TextStyle(fontSize: 14, color: Color(0xFF12161C)),
++        bodySmall: TextStyle(fontSize: 12, color: Color(0xFF4A5563), height: 1.25),
+         bodyMedium:
+-            TextStyle(fontSize: 14, color: Colors.black87, height: 1.25),
++            TextStyle(fontSize: 14, color: Color(0xFF12161C), height: 1.25),
+         labelLarge: TextStyle(fontSize: 16.0, color: MyTheme.accent80)),
+-    cardColor: grayBg,
+-    hintColor: Color(0xFFAAAAAA),
++    cardColor: Color(0xFFE8E2D4),
++    hintColor: Color(0xFF4A5563),
+     visualDensity: VisualDensity.adaptivePlatformDensity,
+     tabBarTheme: const TabBarTheme(
+-      labelColor: Colors.black87,
++      labelColor: Color(0xFFB8892A),
+     ),
+     tooltipTheme: tooltipTheme(),
+     splashColor: (isDesktop || isWebDesktop) ? Colors.transparent : null,
+@@ -432,6 +435,7 @@ class MyTheme {
+     elevatedButtonTheme: ElevatedButtonThemeData(
+       style: ElevatedButton.styleFrom(
+         backgroundColor: MyTheme.accent,
++        foregroundColor: Color(0xFFF3EFE6),
+         shape: RoundedRectangleBorder(
+           borderRadius: BorderRadius.circular(8.0),
+         ),
+@@ -439,8 +443,8 @@ class MyTheme {
+     ),
+     outlinedButtonTheme: OutlinedButtonThemeData(
+       style: OutlinedButton.styleFrom(
+-        backgroundColor: grayBg,
+-        foregroundColor: Colors.black87,
++        backgroundColor: Color(0xFFE8E2D4),
++        foregroundColor: Color(0xFF12161C),
+         shape: RoundedRectangleBorder(
+           borderRadius: BorderRadius.circular(8.0),
+         ),
+@@ -452,15 +456,15 @@ class MyTheme {
+     listTileTheme: listTileTheme,
+     menuBarTheme: MenuBarThemeData(
+         style:
+-            MenuStyle(backgroundColor: MaterialStatePropertyAll(Colors.white))),
++            MenuStyle(backgroundColor: MaterialStatePropertyAll(Color(0xFFF3EFE6)))),
+     colorScheme: ColorScheme.light(
+-        primary: Colors.blue, secondary: accent, background: grayBg),
++        primary: accent, secondary: accent, background: Color(0xFFE8E2D4), onPrimary: Color(0xFFF3EFE6)),
+     popupMenuTheme: PopupMenuThemeData(
+-        color: Colors.white,
++        color: Color(0xFFF3EFE6),
+         shape: RoundedRectangleBorder(
+           side: BorderSide(
+               color: (isDesktop || isWebDesktop)
+-                  ? Color(0xFFECECEC)
++                  ? Color(0x3812161C)
+                   : Colors.transparent),
+           borderRadius: BorderRadius.all(Radius.circular(8.0)),
+         )),
+@@ -473,9 +477,9 @@ class MyTheme {
+   static ThemeData darkTheme = ThemeData(
+     useMaterial3: false,
+     brightness: Brightness.dark,
+-    hoverColor: Color.fromARGB(255, 45, 46, 53),
+-    scaffoldBackgroundColor: Color(0xFF18191E),
+-    dialogBackgroundColor: Color(0xFF18191E),
++    hoverColor: Color.fromARGB(255, 40, 40, 40),
++    scaffoldBackgroundColor: Color(0xFF0B0B0B),
++    dialogBackgroundColor: Color(0xFF141414),
+     appBarTheme: AppBarTheme(
+       shadowColor: Colors.transparent,
+     ),
+@@ -535,8 +539,8 @@ class MyTheme {
+     elevatedButtonTheme: ElevatedButtonThemeData(
+       style: ElevatedButton.styleFrom(
+         backgroundColor: MyTheme.accent,
+-        foregroundColor: Colors.white,
+-        disabledForegroundColor: Colors.white70,
++        foregroundColor: Color(0xFF111111),
++        disabledForegroundColor: Colors.white54,
+         disabledBackgroundColor: Colors.white10,
+         shape: RoundedRectangleBorder(
+           borderRadius: BorderRadius.circular(8.0),
+@@ -545,10 +549,10 @@ class MyTheme {
+     ),
+     outlinedButtonTheme: OutlinedButtonThemeData(
+       style: OutlinedButton.styleFrom(
+-        backgroundColor: Color(0xFF24252B),
++        backgroundColor: Color(0xFF1C1C1C),
+         side: BorderSide(color: Colors.white12, width: 0.5),
+-        disabledForegroundColor: Colors.white70,
+-        foregroundColor: Colors.white70,
++        disabledForegroundColor: Colors.white54,
++        foregroundColor: Color(0xFFF2F2F2),
+         shape: RoundedRectangleBorder(
+           borderRadius: BorderRadius.circular(8.0),
+         ),
+@@ -560,11 +564,11 @@ class MyTheme {
+     listTileTheme: listTileTheme,
+     menuBarTheme: MenuBarThemeData(
+         style: MenuStyle(
+-            backgroundColor: MaterialStatePropertyAll(Color(0xFF121212)))),
++            backgroundColor: MaterialStatePropertyAll(Color(0xFF0B0B0B)))),
+     colorScheme: ColorScheme.dark(
+-      primary: Colors.blue,
++      primary: accent,
+       secondary: accent,
+-      background: Color(0xFF24252B),
++      background: Color(0xFF1C1C1C),
+     ),
+     popupMenuTheme: PopupMenuThemeData(
+         shape: RoundedRectangleBorder(
+@@ -579,7 +583,8 @@ class MyTheme {
+   );
+ 
+   static ThemeMode getThemeModePreference() {
+-    return themeModeFromString(bind.mainGetLocalOption(key: kCommConfKeyTheme));
++    // DeskForce: product UI is paper/brass light
++    return ThemeMode.light;
+   }
+ 
+   static Future<void> changeDarkMode(ThemeMode mode) async {
+@@ -1270,7 +1275,7 @@ Color? _msgboxColor(String type) {
+   if (type.contains("error") || type == "re-input-password") {
+     return Color(0xFFE04F5F);
+   }
+-  return Color(0xFF2C8CFF);
++  return MyTheme.accent; // DeskForce brass
+ }
+ 
+ Widget msgboxIcon(String type) {
+diff --git a/flutter/lib/desktop/pages/desktop_home_page.dart b/flutter/lib/desktop/pages/desktop_home_page.dart
+index 339ecdd..2b67be7 100644
+--- a/flutter/lib/desktop/pages/desktop_home_page.dart
++++ b/flutter/lib/desktop/pages/desktop_home_page.dart
+@@ -33,7 +33,7 @@ class DesktopHomePage extends StatefulWidget {
+   State<DesktopHomePage> createState() => _DesktopHomePageState();
+ }
+ 
+-const borderColor = Color(0xFF2F65BA);
++const borderColor = Color(0xFFB8892A);
+ 
+ class _DesktopHomePageState extends State<DesktopHomePage>
+     with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
+@@ -90,6 +90,30 @@ class _DesktopHomePageState extends State<DesktopHomePage>
+         alignment: Alignment.center,
+         child: loadLogo(),
+       ),
++      Padding(
++        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
++        child: Column(
++          children: [
++            SizedBox(
++              width: double.infinity,
++              child: ElevatedButton(
++                onPressed: () => launchUrl(
++                    Uri.parse('https://deskforce.dr6ter.ru/cabinet/?embed=1')),
++                child: const Text('Личный кабинет'),
++              ),
++            ),
++            const SizedBox(height: 8),
++            SizedBox(
++              width: double.infinity,
++              child: OutlinedButton(
++                onPressed: () => launchUrl(Uri.parse(
++                    'https://deskforce.dr6ter.ru/cabinet/billing?embed=1')),
++                child: const Text('Тарифы'),
++              ),
++            ),
++          ],
++        ),
++      ),
+       buildTip(context),
+       if (!isOutgoingOnly) buildIDBoard(context),
+       if (!isOutgoingOnly) buildPasswordBoard(context),
+diff --git a/flutter/lib/desktop/pages/desktop_setting_page.dart b/flutter/lib/desktop/pages/desktop_setting_page.dart
+index 82212d1..d5c9187 100644
+--- a/flutter/lib/desktop/pages/desktop_setting_page.dart
++++ b/flutter/lib/desktop/pages/desktop_setting_page.dart
+@@ -2360,7 +2360,7 @@ class _AboutState extends State<_About> {
+       final scrollController = ScrollController();
+       return SingleChildScrollView(
+         controller: scrollController,
+-        child: _Card(title: translate('About RustDesk'), children: [
++        child: _Card(title: 'О DeskForce УД', children: [
+           Column(
+             crossAxisAlignment: CrossAxisAlignment.start,
+             children: [
+@@ -2379,22 +2379,30 @@ class _AboutState extends State<_About> {
+                         .marginSymmetric(vertical: 4.0)),
+               InkWell(
+                   onTap: () {
+-                    launchUrlString('https://rustdesk.com/privacy.html');
++                    launchUrlString('https://rustdesk.dr6ter.ru/cabinet/?embed=1');
+                   },
+                   child: Text(
+-                    translate('Privacy Statement'),
++                    'Личный кабинет',
+                     style: linkStyle,
+                   ).marginSymmetric(vertical: 4.0)),
+               InkWell(
+                   onTap: () {
+-                    launchUrlString('https://rustdesk.com');
++                    launchUrlString('https://rustdesk.dr6ter.ru/cabinet/billing?embed=1');
+                   },
+                   child: Text(
+-                    translate('Website'),
++                    'Тарифы и оплата',
++                    style: linkStyle,
++                  ).marginSymmetric(vertical: 4.0)),
++              InkWell(
++                  onTap: () {
++                    launchUrlString('https://rustdesk.dr6ter.ru/pilot');
++                  },
++                  child: Text(
++                    'Сайт / пилот',
+                     style: linkStyle,
+                   ).marginSymmetric(vertical: 4.0)),
+               Container(
+-                decoration: const BoxDecoration(color: Color(0xFF2c8cff)),
++                decoration: const BoxDecoration(color: Color(0xFFF5C518)),
+                 padding:
+                     const EdgeInsets.symmetric(vertical: 24, horizontal: 8),
+                 child: SelectionArea(
+@@ -2405,8 +2413,8 @@ class _AboutState extends State<_About> {
+                         crossAxisAlignment: CrossAxisAlignment.start,
+                         children: [
+                           Text(
+-                            'Copyright © ${DateTime.now().toString().substring(0, 4)} Purslane Ltd.\n$license',
+-                            style: const TextStyle(color: Colors.white),
++                            'Copyright © ${DateTime.now().toString().substring(0, 4)} DeskForce УД\n$license',
++                            style: const TextStyle(color: Color(0xFF111111)),
+                           ),
+                           Text(
+                             translate('Slogan_tip'),
+diff --git a/flutter/lib/desktop/widgets/tabbar_widget.dart b/flutter/lib/desktop/widgets/tabbar_widget.dart
+index ac7d800..d389929 100644
+--- a/flutter/lib/desktop/widgets/tabbar_widget.dart
++++ b/flutter/lib/desktop/widgets/tabbar_widget.dart
+@@ -1456,15 +1456,15 @@ class TabbarTheme extends ThemeExtension<TabbarTheme> {
+ 
+   static const light = TabbarTheme(
+       selectedTabIconColor: MyTheme.accent,
+-      unSelectedTabIconColor: Color.fromARGB(255, 162, 203, 241),
+-      selectedTextColor: Colors.black,
+-      unSelectedTextColor: Color.fromARGB(255, 112, 112, 112),
+-      selectedIconColor: Color.fromARGB(255, 26, 26, 26),
+-      unSelectedIconColor: Color.fromARGB(255, 96, 96, 96),
+-      dividerColor: Color.fromARGB(255, 238, 238, 238),
+-      hoverColor: Colors.white54,
+-      closeHoverColor: Colors.white,
+-      selectedTabBackgroundColor: Colors.white54);
++      unSelectedTabIconColor: Color(0xFF4A5563),
++      selectedTextColor: Color(0xFF12161C),
++      unSelectedTextColor: Color(0xFF4A5563),
++      selectedIconColor: Color(0xFF12161C),
++      unSelectedIconColor: Color(0xFF4A5563),
++      dividerColor: Color(0x3812161C),
++      hoverColor: Color(0x66E8E2D4),
++      closeHoverColor: Color(0xFFF3EFE6),
++      selectedTabBackgroundColor: Color(0x66E8E2D4));
+ 
+   static const dark = TabbarTheme(
+       selectedTabIconColor: MyTheme.accent,
+diff --git a/flutter/lib/desktop/widgets/titlebar_widget.dart b/flutter/lib/desktop/widgets/titlebar_widget.dart
+index 38e4d91..1f302ff 100644
+--- a/flutter/lib/desktop/widgets/titlebar_widget.dart
++++ b/flutter/lib/desktop/widgets/titlebar_widget.dart
+@@ -1,8 +1,9 @@
+ import 'package:flutter/material.dart';
+ 
+-const sidebarColor = Color(0xFF0C6AF6);
+-const backgroundStartColor = Color(0xFF0583EA);
+-const backgroundEndColor = Color(0xFF0697EA);
++// DeskForce paper/brass title bar
++const sidebarColor = Color(0xFFE8E2D4);
++const backgroundStartColor = Color(0xFFF3EFE6);
++const backgroundEndColor = Color(0xFFE8E2D4);
+ 
+ class DesktopTitleBar extends StatelessWidget {
+   final Widget? child;
+@@ -28,4 +29,4 @@ class DesktopTitleBar extends StatelessWidget {
+       ),
+     );
+   }
+-}
+\ No newline at end of file
++}
+diff --git a/flutter/lib/models/peer_tab_model.dart b/flutter/lib/models/peer_tab_model.dart
+index e5fa7fb..a2f4619 100644
+--- a/flutter/lib/models/peer_tab_model.dart
++++ b/flutter/lib/models/peer_tab_model.dart
+@@ -38,11 +38,11 @@ class PeerTabModel with ChangeNotifier {
+     IconFont.deviceGroupFill,
+   ];
+   List<bool> isEnabled = List.from([
+-    true,
+-    true,
+-    !isWeb && bind.mainGetLocalOption(key: "disable-discovery-panel") != "Y",
+-    !(bind.isDisableAb() || bind.isDisableAccount()),
+-    !(bind.isDisableGroupPanel() || bind.isDisableAccount()),
++    false, // recent — DeskForce simplified UI
++    false, // favorites
++    false, // discovered / LAN
++    false, // address book
++    false, // accessible devices / group
+   ]);
+   final List<bool> _isVisible = List.filled(maxTabCount, true, growable: false);
+   List<bool> get isVisibleEnabled => () {
+diff --git a/flutter/pubspec.yaml b/flutter/pubspec.yaml
+index eb6d761..fd45fa9 100644
+--- a/flutter/pubspec.yaml
++++ b/flutter/pubspec.yaml
+@@ -1,5 +1,5 @@
+ name: flutter_hbb
+-description: Your Remote Desktop Software
++description: "DeskForce remote desktop"
+ 
+ # The following line prevents the package from being accidentally published to
+ # pub.dev using `pub publish`. This is preferred for private packages.
+diff --git a/flutter/windows/runner/Runner.rc b/flutter/windows/runner/Runner.rc
+index ab1b7e0..c115681 100644
+--- a/flutter/windows/runner/Runner.rc
++++ b/flutter/windows/runner/Runner.rc
+@@ -90,12 +90,12 @@ BEGIN
+         BLOCK "040904e4"
+         BEGIN
+             VALUE "CompanyName", "Purslane Ltd" "\0"
+-            VALUE "FileDescription", "RustDesk Remote Desktop" "\0"
++            VALUE "FileDescription", "DeskForce Remote Desktop" "\0"
+             VALUE "FileVersion", VERSION_AS_STRING "\0"
+             VALUE "InternalName", "rustdesk" "\0"
+             VALUE "LegalCopyright", "Copyright © 2025 Purslane Ltd. All rights reserved." "\0"
+             VALUE "OriginalFilename", "rustdesk.exe" "\0"
+-            VALUE "ProductName", "RustDesk" "\0"
++            VALUE "ProductName", "DeskForce" "\0"
+             VALUE "ProductVersion", VERSION_AS_STRING "\0"
+         END
+     END
+diff --git a/src/common.rs b/src/common.rs
+index 3e23770..10e604b 100644
+--- a/src/common.rs
++++ b/src/common.rs
+@@ -2517,3 +2517,61 @@ mod tests {
+         assert_eq!(combined_mask >> 3, MOUSE_BUTTON_LEFT | MOUSE_BUTTON_RIGHT);
+     }
+ }
++
++
++// DESKFORCE_OEM_BEGIN
++// OEM defaults injected by DeskForce apply_branding.py
++pub const DESKFORCE_ID_SERVER: &str = "78.29.49.98";
++pub const DESKFORCE_RELAY_SERVER: &str = "78.29.49.98";
++pub const DESKFORCE_API_SERVER: &str = "https://deskforce.dr6ter.ru";
++pub const DESKFORCE_KEY: &str = "ERushCbh73QS5YNPuOvqK5M3Yx9v9z+8Ft5O+iAQevg=";
++
++/// Seed overwrite/builtin maps so servers and UI cuts are locked in the binary.
++pub fn apply_deskforce_oem() {
++    use hbb_common::config::{
++        APP_NAME, BUILTIN_SETTINGS, DEFAULT_LOCAL_SETTINGS, DEFAULT_SETTINGS, HARD_SETTINGS,
++        OVERWRITE_LOCAL_SETTINGS, OVERWRITE_SETTINGS, PROD_RENDEZVOUS_SERVER,
++    };
++    *APP_NAME.write().unwrap() = "DeskForce".to_owned();
++    *PROD_RENDEZVOUS_SERVER.write().unwrap() = DESKFORCE_ID_SERVER.to_owned();
++
++    let mut ow = OVERWRITE_SETTINGS.write().unwrap();
++    ow.insert("custom-rendezvous-server".into(), DESKFORCE_ID_SERVER.into());
++    ow.insert("relay-server".into(), DESKFORCE_RELAY_SERVER.into());
++    ow.insert("api-server".into(), DESKFORCE_API_SERVER.into());
++    ow.insert("key".into(), DESKFORCE_KEY.into());
++    drop(ow);
++
++    let mut def = DEFAULT_SETTINGS.write().unwrap();
++    def.insert("custom-rendezvous-server".into(), DESKFORCE_ID_SERVER.into());
++    def.insert("relay-server".into(), DESKFORCE_RELAY_SERVER.into());
++    def.insert("api-server".into(), DESKFORCE_API_SERVER.into());
++    def.insert("key".into(), DESKFORCE_KEY.into());
++    drop(def);
++
++    let mut bi = BUILTIN_SETTINGS.write().unwrap();
++    bi.insert("hide-network-settings".into(), "Y".into());
++    bi.insert("hide-server-settings".into(), "Y".into());
++    bi.insert("hide-proxy-settings".into(), "Y".into());
++    bi.insert("hide-websocket-settings".into(), "Y".into());
++    bi.insert("allow-remote-config-modification".into(), "N".into());
++    bi.insert("hide-powered-by-me".into(), "Y".into());
++    drop(bi);
++
++    let mut hard = HARD_SETTINGS.write().unwrap();
++    hard.insert("disable-ab".into(), "Y".into());
++    hard.insert("disable-account".into(), "Y".into());
++    drop(hard);
++
++    let mut loc = DEFAULT_LOCAL_SETTINGS.write().unwrap();
++    loc.insert("disable-discovery-panel".into(), "Y".into());
++    loc.insert("disable-group-panel".into(), "Y".into());
++    loc.insert("theme".into(), "light".into());
++    drop(loc);
++
++    let mut oloc = OVERWRITE_LOCAL_SETTINGS.write().unwrap();
++    oloc.insert("theme".into(), "light".into());
++    oloc.insert("disable-discovery-panel".into(), "Y".into());
++    drop(oloc);
++}
++// DESKFORCE_OEM_END
+diff --git a/src/flutter_ffi.rs b/src/flutter_ffi.rs
+index 551ad79..85d457a 100644
+--- a/src/flutter_ffi.rs
++++ b/src/flutter_ffi.rs
+@@ -50,6 +50,7 @@ fn initialize(app_dir: &str, custom_client_config: &str) {
+     } else {
+         crate::read_custom_client(custom_client_config);
+     }
++    crate::common::apply_deskforce_oem();
+     #[cfg(target_os = "android")]
+     {
+         // flexi_logger can't work when android_logger initialized.

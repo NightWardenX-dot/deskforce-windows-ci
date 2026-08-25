@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="DeskForce">
+  <!-- DeskForce mark: full-height geometric D tuned for 16px ICO mipmaps.
+       Stem ~3/16 wide; top/bottom bars ~3/16 so they survive 16×16 rasterization.
+       Counter is centered (not upper-only like P). Accent sits outside the bowl. -->
+  <rect width="512" height="512" rx="96" fill="#12161c"/>
+  <path fill="#b8892a" fill-rule="evenodd" d="
+    M 96 80
+    H 248
+    C 392 80 432 152 432 256
+    C 432 360 392 432 248 432
+    H 96
+    Z
+    M 192 176
+    H 248
+    C 328 176 352 208 352 256
+    C 352 304 328 336 248 336
+    H 192
+    Z"/>
+  <circle cx="448" cy="400" r="28" fill="#e8e2d4"/>
+</svg>
