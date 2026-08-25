@@ -84,6 +84,28 @@ jobs:
 
           test -f rustdesk/flutter/lib/desktop/pages/deskforce_settings_page.dart
           test -f rustdesk/flutter/lib/common/deskforce_startup.dart
+          # Mobile connection page must be full DeskForce override (no stock RawAutocomplete leftovers)
+          test -f rustdesk/flutter/lib/mobile/pages/connection_page.dart
+          grep -q "DeskForce mobile connect" rustdesk/flutter/lib/mobile/pages/connection_page.dart
+          ! grep -q "RawAutocomplete<" rustdesk/flutter/lib/mobile/pages/connection_page.dart
+          ! grep -q "_allPeersLoader" rustdesk/flutter/lib/mobile/pages/connection_page.dart
+          ! grep -q "widgets/autocomplete.dart" rustdesk/flutter/lib/mobile/pages/connection_page.dart
+          # Lightweight Dart syntax gate (balanced braces/parens) before expensive FFI/build_runner
+          python3 - <<'PYCHECK'
+from pathlib import Path
+p = Path("rustdesk/flutter/lib/mobile/pages/connection_page.dart")
+t = p.read_text(encoding="utf-8")
+assert "RawAutocomplete<" not in t and "_allPeersLoader" not in t
+# strip strings/comments roughly then balance
+import re
+s = re.sub(r"//.*?$", "", t, flags=re.M)
+s = re.sub(r"/\*.*?\*/", "", s, flags=re.S)
+s = re.sub(r"'(?:\\.|[^'\\])*'|\"(?:\\.|[^\"\\])*\"", "", s)
+for a,b in (("(",")"),("{","}"),("[","]")):
+    if s.count(a) != s.count(b):
+        raise SystemExit(f"unbalanced {a}{b} in {p}")
+print("mobile connection_page.dart syntax OK")
+PYCHECK
           grep -q "dfApplyStartupWindowBehavior" rustdesk/flutter/lib/main.dart
           grep -q "Автозапуск" rustdesk/flutter/lib/desktop/pages/deskforce_settings_page.dart
           grep -q "Полноэкранный режим при запуске" rustdesk/flutter/lib/desktop/pages/deskforce_settings_page.dart

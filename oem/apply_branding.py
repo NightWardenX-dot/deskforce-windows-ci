@@ -1600,72 +1600,58 @@ def patch_mobile_branding(src: pathlib.Path, app_name: str) -> None:
 
 
 def patch_mobile_connection_page(src: pathlib.Path, app_name: str) -> None:
+    """Replace stock mobile connection page with DeskForce full override.
+
+    Surgical RawAutocomplete half-edits break Dart on RustDesk 1.4.6+; always
+    overwrite from oem/overrides (same approach as desktop connection_page).
+    """
     path = src / "flutter" / "lib" / "mobile" / "pages" / "connection_page.dart"
     if not path.is_file():
         return
     content = path.read_text(encoding="utf-8", errors="ignore")
-    # Skip if already patched (DeskForce version has PeerTabPage and no autocomplete)
-    if "PeerTabPage" in content and "_allPeersLoader" not in content:
+    stockish = (
+        "RawAutocomplete<" in content
+        or "_allPeersLoader" in content
+        or "widgets/autocomplete.dart" in content
+    )
+    deskforce_ok = (
+        "PeerTabPage" in content
+        and "RawAutocomplete<" not in content
+        and "_allPeersLoader" not in content
+        and "DeskForce mobile connect" in content
+    )
+    if deskforce_ok and not stockish:
+        print("OK already: mobile connection_page.dart")
         return
-    text = content
-    # Remove update banner (DeskForce handles updates via update.json, not in-app banner)
-    lines = text.splitlines()
-    cleaned = []
-    skip_banner = False
-    brace_depth = 0
-    for line in lines:
-        if not skip_banner:
-            if "_buildUpdateUI" in line and "Widget" in line:
-                skip_banner = True
-                brace_depth = 0
-                for ch in line:
-                    if ch == '{':
-                        brace_depth += 1
-                    elif ch == '}':
-                        brace_depth -= 1
-                continue
-        if skip_banner:
-            for ch in line:
-                if ch == '{':
-                    brace_depth += 1
-                elif ch == '}':
-                    brace_depth -= 1
-            if brace_depth <= 0:
-                skip_banner = False
-            continue
-        cleaned.append(line)
-    text = "\n".join(cleaned)
-    # Replace stock RustDesk colors with brass
-    text = text.replace("color: MyTheme.idColor", "color: Color(0xFF8F6A1C)")
-    text = text.replace("color: MyTheme.darkGray", "color: Color(0xFF4A5563)")
-    text = text.replace("Icons.arrow_forward, color: MyTheme.darkGray", "Icons.arrow_forward, color: Color(0xFFB8892A)")
-    text = text.replace("rustdesk://", "deskforce://")
-    # Remove autocomplete imports and state
-    text = text.replace("import '../../common/widgets/autocomplete.dart';\n", "")
-    text = text.replace("final AllPeersLoader _allPeersLoader = AllPeersLoader();\n", "")
-    text = text.replace("final Iterable<Peer> _autocompleteOpts = [];\n", "")
-    text = text.replace("Iterable<Peer> _autocompleteOpts = [];\n", "")
-    text = text.replace("_allPeersLoader.init(setState);\n", "")
-    text = text.replace("_allPeersLoader.clear();\n", "")
-    # Remove RawAutocomplete widget tree
-    text = text.replace("RawAutocomplete<Peer>(", "// DeskForce: removed RawAutocomplete")
-    text = text.replace("optionsBuilder: (TextEditingValue textEditingValue) {", "")
-    text = text.replace("fieldViewBuilder:", "// DeskForce: removed fieldViewBuilder")
-    text = text.replace("onSelected: (option) {", "")
-    text = text.replace("optionsViewBuilder:", "// DeskForce: removed optionsViewBuilder")
-    text = text.replace("return _autocompleteOpts;", "return const Iterable<Peer>.empty();")
-    text = text.replace("_autocompleteOpts = const Iterable<Peer>.empty();", "")
-    text = text.replace("_autocompleteOpts = [emptyPeer];", "")
-    text = text.replace("_autocompleteOpts = _allPeersLoader.peers", "// DeskForce: removed autocomplete")
-    text = text.replace("_autocompleteOpts = _allPeersLoader", "// DeskForce: removed autocomplete")
-    # Replace return with PeerTabPage
-    old_return = "    final child = Column(children: [\n      if (isWebDesktop)\n        getConnectionPageTitle(context, true)\n            .marginOnly(bottom: 10, top: 15, left: 12),\n      w\n    ]);\n    return Align(\n        alignment: Alignment.topCenter,\n        child: Container(constraints: kMobilePageConstraints, child: child));"
-    new_return = "    return CustomScrollView(\n      slivers: [\n        SliverList(delegate: SliverChildListDelegate([w])),\n        SliverFillRemaining(\n          hasScrollBody: true,\n          child: PeerTabPage(),\n        )\n      ],\n    ).marginOnly(top: 2, left: 10, right: 10);"
-    text = text.replace(old_return, new_return)
-    if text != content:
-        path.write_text(text, encoding="utf-8")
-        print("Patched mobile connection_page.dart")
 
+    root = pathlib.Path(__file__).resolve().parent
+    override = (
+        root
+        / "overrides"
+        / "flutter"
+        / "lib"
+        / "mobile"
+        / "pages"
+        / "connection_page.dart"
+    )
+    if not override.is_file():
+        print(
+            "ERROR: missing oem/overrides/.../mobile/pages/connection_page.dart "
+            "(refusing surgical RawAutocomplete edits)",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(override, path)
+    text = path.read_text(encoding="utf-8", errors="ignore")
+    if "RawAutocomplete<" in text or "_allPeersLoader" in text:
+        print(
+            "ERROR: mobile connection_page override still contains RawAutocomplete",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+    print("Patched mobile connection_page.dart (full UI override)")
 
 if __name__ == "__main__":
     raise SystemExit(main())
