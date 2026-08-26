@@ -116,7 +116,17 @@ class _DeskForceCabinetPageState extends State<DeskForceCabinetPage> {
       });
     }
     return Container(
-      color: DfCabinetTheme.paper,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFF070B14),
+            Color(0xFF0C1422),
+            Color(0xFF070B14),
+          ],
+        ),
+      ),
       child: Column(
         children: [
           _topBar(),
@@ -143,8 +153,8 @@ class _DeskForceCabinetPageState extends State<DeskForceCabinetPage> {
 
   Widget _topBar() {
     return Container(
-      height: 44,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      height: 52,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: const BoxDecoration(
         color: DfCabinetTheme.bar,
         border: Border(bottom: BorderSide(color: DfCabinetTheme.border)),
@@ -217,7 +227,7 @@ class _DeskForceCabinetPageState extends State<DeskForceCabinetPage> {
     return Container(
       width: 168,
       decoration: const BoxDecoration(
-        color: Color(0xFFEFE9DC),
+        color: Color(0xCC0F172A),
         border: Border(right: BorderSide(color: DfCabinetTheme.border)),
       ),
       child: ListView(
@@ -242,7 +252,7 @@ class _DeskForceCabinetPageState extends State<DeskForceCabinetPage> {
     required VoidCallback onTap,
   }) {
     return Material(
-      color: selected ? const Color(0x33B8892A) : Colors.transparent,
+      color: selected ? const Color(0x262DD4BF) : Colors.transparent,
       child: InkWell(
         onTap: onTap,
         child: Padding(

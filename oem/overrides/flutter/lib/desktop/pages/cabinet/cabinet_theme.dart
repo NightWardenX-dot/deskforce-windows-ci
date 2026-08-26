@@ -2,52 +2,52 @@ import 'package:flutter/material.dart';
 
 /// DeskForce paper / brass palette shared by native cabinet screens.
 class DfCabinetTheme {
-  static const ink = Color(0xFF12161C);
-  static const paper = Color(0xFFF3EFE6);
-  static const card = Color(0xFFFBF8F1);
-  static const brass = Color(0xFFB8892A);
-  static const brassDeep = Color(0xFF8F6A1C);
-  static const bar = Color(0xFFE8E2D4);
-  static const border = Color(0x3312161C);
-  static const danger = Color(0xFFB33A2B);
-  static const ok = Color(0xFF2F6B3A);
+  static const ink = Color(0xFFE8F4FF);
+  static const paper = Color(0xFF070B14);
+  static const card = Color(0xD60C1422);
+  static const brass = Color(0xFF2DD4BF);
+  static const brassDeep = Color(0xFF0D9488);
+  static const bar = Color(0xEE070B14);
+  static const border = Color(0x338BA0B8);
+  static const danger = Color(0xFFF87171);
+  static const ok = Color(0xFF34D399);
 
   static InputDecoration field(String label, {String? hint}) => InputDecoration(
         labelText: label,
         hintText: hint,
         labelStyle: TextStyle(color: ink.withOpacity(0.65)),
         filled: true,
-        fillColor: card,
+        fillColor: const Color(0xEE111827),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(10),
           borderSide: const BorderSide(color: border),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(10),
           borderSide: const BorderSide(color: border),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(10),
           borderSide: const BorderSide(color: brass, width: 1.4),
         ),
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       );
 
   static ButtonStyle primaryButton() => ElevatedButton.styleFrom(
         backgroundColor: brass,
-        foregroundColor: Colors.white,
+        foregroundColor: const Color(0xFF041016),
         elevation: 0,
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       );
 
   static ButtonStyle ghostButton() => OutlinedButton.styleFrom(
         foregroundColor: ink,
         side: const BorderSide(color: brass, width: 1.2),
-        backgroundColor: card,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+        backgroundColor: const Color(0xB30F172A),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       );
 
   static Widget panel({required Widget child, EdgeInsetsGeometry? padding}) {
@@ -56,11 +56,11 @@ class DfCabinetTheme {
       padding: padding ?? const EdgeInsets.fromLTRB(18, 16, 18, 16),
       decoration: BoxDecoration(
         color: card,
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: border),
         boxShadow: const [
           BoxShadow(
-              color: Color(0x1412161C), blurRadius: 14, offset: Offset(0, 5)),
+              color: Color(0x38000000), blurRadius: 26, offset: Offset(0, 18)),
         ],
       ),
       child: child,

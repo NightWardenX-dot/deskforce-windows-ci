@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -13,10 +14,10 @@ const kDfUpdateHost = 'deskforce.dr6ter.ru';
 const kDfUpdateJsonUrl = 'https://$kDfUpdateHost/downloads/update.json';
 const kDfUpdateApiUrl = 'https://$kDfUpdateHost/api/client/update';
 
-const _ink = Color(0xFF12161C);
-const _paper = Color(0xFFF3EFE6);
-const _card = Color(0xFFFBF8F1);
-const _brass = Color(0xFFB8892A);
+const _ink = Color(0xFFE8F4FF);
+const _paper = Color(0xFF070B14);
+const _card = Color(0xD60C1422);
+const _brass = Color(0xFF2DD4BF);
 
 
 class DeskForceUpdateBannerData {
@@ -128,6 +129,7 @@ class DeskForceUpdateInfo {
     required this.mandatory,
     required this.releaseNotes,
     required this.available,
+    this.archiveUrl = '',
     this.updateAvailable,
   });
 
@@ -137,11 +139,18 @@ class DeskForceUpdateInfo {
   final bool mandatory;
   final String releaseNotes;
   final bool available;
+  final String archiveUrl;
   /// Server-side compare result when client sent ?version= (null = unknown).
   final bool? updateAvailable;
 
   bool get hasDownload =>
-      available && downloadUrl.isNotEmpty && _isAllowedUrl(downloadUrl);
+      available && (_isAllowedUrl(downloadUrl) || _isAllowedUrl(archiveUrl));
+
+  String get preferredDownloadUrl {
+    if (Platform.isWindows && _isAllowedUrl(archiveUrl)) return archiveUrl;
+    if (_isAllowedUrl(downloadUrl)) return downloadUrl;
+    return archiveUrl;
+  }
 }
 
 bool _isAllowedUrl(String url) {
@@ -264,19 +273,28 @@ DeskForceUpdateInfo? _parsePlatform(Map<String, dynamic> map, String plat) {
   final version = '${map['version'] ?? ''}'.trim();
   if (version.isEmpty) return null;
   var url = '${map['download_url'] ?? ''}'.trim();
+  var archiveUrl = '';
   final urls = map['download_urls'];
-  if (url.isEmpty && urls is Map) {
-    for (final key in ['exe', 'apk', 'deb', 'appimage', 'zip']) {
-      final v = '${urls[key] ?? ''}'.trim();
-      if (v.isNotEmpty) {
-        url = v;
-        break;
+  if (urls is Map) {
+    if (plat == 'windows') {
+      archiveUrl = '${urls['zip'] ?? ''}'.trim();
+    }
+    if (url.isEmpty) {
+      for (final key in ['exe', 'apk', 'deb', 'appimage', 'zip']) {
+        final v = '${urls[key] ?? ''}'.trim();
+        if (v.isNotEmpty) {
+          url = v;
+          break;
+        }
       }
     }
   }
   if (url.isNotEmpty && !_isAllowedUrl(url)) {
     // Refuse any non-DeskForce host.
     url = '';
+  }
+  if (archiveUrl.isNotEmpty && !_isAllowedUrl(archiveUrl)) {
+    archiveUrl = '';
   }
   bool? updateAvail;
   if (map.containsKey('update_available')) {
@@ -289,6 +307,7 @@ DeskForceUpdateInfo? _parsePlatform(Map<String, dynamic> map, String plat) {
     mandatory: map['mandatory'] == true,
     releaseNotes: '${map['release_notes'] ?? ''}'.trim(),
     available: map['available'] != false,
+    archiveUrl: archiveUrl,
     updateAvailable: updateAvail,
   );
 }
@@ -301,51 +320,116 @@ Future<String> dfLocalAppVersion() async {
   return '1.0';
 }
 
-Future<void> dfDownloadAndExecute(BuildContext context, String url) async {
-  try {
-    final uri = Uri.parse(url);
-    final tempDir = await getTemporaryDirectory();
-    final fileName = uri.pathSegments.last;
-    final filePath = p.join(tempDir.path, fileName);
-
-    final resp = await http.get(uri).timeout(const Duration(seconds: 60));
-    if (resp.statusCode == 200) {
-      await File(filePath).writeAsBytes(resp.bodyBytes);
-      if (context.mounted) {
-        await showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (_) => const Center(
-            child: Card(
-              color: _card,
-              child: Padding(
-                padding: EdgeInsets.all(22),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(strokeWidth: 2.4, color: _brass),
-                    ),
-                    SizedBox(width: 14),
-                    Text('Запуск установки...', style: TextStyle(color: _ink)),
-                  ],
-                ),
+Future<void> _showUpdateProgress(BuildContext context, String message) async {
+  if (!context.mounted) return;
+  unawaited(showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => Center(
+      child: Card(
+        color: _card,
+        child: Padding(
+          padding: const EdgeInsets.all(22),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2.4, color: _brass),
               ),
-            ),
+              const SizedBox(width: 14),
+              Text(message, style: const TextStyle(color: _ink)),
+            ],
           ),
-        );
-      }
-      await Process.start(filePath, [], runInShell: true);
-      if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
-    } else {
-      throw Exception('HTTP ${resp.statusCode}');
+        ),
+      ),
+    ),
+  ));
+  await Future.delayed(const Duration(milliseconds: 120));
+}
+
+Future<void> _hideUpdateProgress(BuildContext context) async {
+  if (!context.mounted) return;
+  final nav = Navigator.of(context, rootNavigator: true);
+  if (nav.canPop()) {
+    nav.pop();
+  }
+}
+
+String _psQuote(String value) => value.replaceAll("'", "''");
+
+Future<void> _applyWindowsPortableUpdate(String zipUrl) async {
+  final uri = Uri.parse(zipUrl);
+  final tempDir = await getTemporaryDirectory();
+  final stamp = DateTime.now().millisecondsSinceEpoch;
+  final zipPath = p.join(tempDir.path, 'deskforce-update-$stamp.zip');
+  final unpackDir = p.join(tempDir.path, 'deskforce-update-$stamp');
+  final scriptPath = p.join(tempDir.path, 'deskforce-update-$stamp.ps1');
+  final currentExe = Platform.resolvedExecutable;
+  final currentDir = File(currentExe).parent.path;
+
+  final resp = await http.get(uri).timeout(const Duration(minutes: 3));
+  if (resp.statusCode != 200) {
+    throw Exception('HTTP ${resp.statusCode}');
+  }
+  await File(zipPath).writeAsBytes(resp.bodyBytes, flush: true);
+  final unpack = Directory(unpackDir);
+  if (await unpack.exists()) {
+    await unpack.delete(recursive: true);
+  }
+  await unpack.create(recursive: true);
+
+  final ps = '''
+$ErrorActionPreference = 'Stop'
+Start-Sleep -Milliseconds 1200
+$zip = '${_psQuote(zipPath)}'
+$src = '${_psQuote(unpackDir)}'
+$dest = '${_psQuote(currentDir)}'
+$exe = '${_psQuote(currentExe)}'
+Expand-Archive -Path $zip -DestinationPath $src -Force
+for ($i = 0; $i -lt 80; $i++) {
+  try {
+    Copy-Item -Path (Join-Path $src '*') -Destination $dest -Recurse -Force -ErrorAction Stop
+    Start-Sleep -Milliseconds 250
+    Start-Process -FilePath $exe
+    exit 0
+  } catch {
+    Start-Sleep -Milliseconds 500
+  }
+}
+throw 'copy_failed'
+''';
+  await File(scriptPath).writeAsString(ps, flush: true);
+  await Process.start(
+    'powershell',
+    ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath],
+    mode: ProcessStartMode.detached,
+  );
+}
+
+Future<void> dfDownloadAndExecute(BuildContext context, DeskForceUpdateInfo info) async {
+  final preferredUrl = info.preferredDownloadUrl;
+  if (preferredUrl.isEmpty) return;
+  try {
+    await _showUpdateProgress(
+      context,
+      Platform.isWindows && info.archiveUrl.isNotEmpty
+          ? 'Устанавливаем обновление...'
+          : 'Открываем обновление...',
+    );
+    if (Platform.isWindows && info.archiveUrl.isNotEmpty) {
+      await _applyWindowsPortableUpdate(info.archiveUrl);
+      await _hideUpdateProgress(context);
+      exit(0);
     }
+    await launchUrl(Uri.parse(preferredUrl), mode: LaunchMode.externalApplication);
+    await _hideUpdateProgress(context);
   } catch (e) {
     debugPrint('DeskForce direct update failed: $e');
+    await _hideUpdateProgress(context);
     if (context.mounted) {
-      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      await launchUrl(Uri.parse(preferredUrl), mode: LaunchMode.externalApplication);
     }
   }
 }
@@ -450,8 +534,8 @@ Future<void> dfShowUpdateDialog(
       return AlertDialog(
         backgroundColor: _paper,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(6),
-          side: const BorderSide(color: Color(0x66B8892A)),
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: Color(0x338BA0B8)),
         ),
         title: Row(
           children: const [
@@ -481,9 +565,9 @@ Future<void> dfShowUpdateDialog(
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: _card,
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: const Color(0x3312161C)),
+                    color: const Color(0xCC111827),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0x338BA0B8)),
                   ),
                   child: Text(
                     info.releaseNotes,
@@ -510,11 +594,11 @@ Future<void> dfShowUpdateDialog(
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: _brass,
-              foregroundColor: Colors.white,
+              foregroundColor: const Color(0xFF041016),
               elevation: 0,
             ),
             onPressed: () async {
-              await dfDownloadAndExecute(ctx, info.downloadUrl);
+              await dfDownloadAndExecute(ctx, info);
               if (ctx.mounted && !info.mandatory) Navigator.of(ctx).pop();
             },
             child: const Text('Скачать / Установить'),

@@ -234,8 +234,19 @@ class CabinetApi {
     required int formOpenedAt,
     String name = '',
     String captchaId = '',
+    String powNonce = '',
   }) async {
-    final bot = await prepareBotFields(formOpenedAt);
+    Map<String, dynamic> bot;
+    if (powNonce.isNotEmpty && captchaId.isNotEmpty) {
+      bot = botFields(
+        formOpenedAt: formOpenedAt,
+        captchaId: captchaId,
+        powNonce: powNonce,
+        pointerEvents: 3,
+      );
+    } else {
+      bot = await prepareBotFields(formOpenedAt);
+    }
     final data = await post('/auth/register', auth: false, body: {
       'username': username,
       'password': password,

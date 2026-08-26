@@ -31,6 +31,8 @@ class _CabinetAuthScreenState extends State<CabinetAuthScreen> {
   String _ok = '';
   late int _formOpenedAt;
   String _challengeId = '';
+  String _challengePowNonce = '';
+  bool _challengeLoading = false;
 
   @override
   void initState() {
@@ -51,9 +53,37 @@ class _CabinetAuthScreenState extends State<CabinetAuthScreen> {
   }
 
   Future<void> _loadChallenge() async {
-    final ch = await CabinetApi.instance.fetchChallenge();
-    if (!mounted || ch == null) return;
-    setState(() => _challengeId = (ch['id'] ?? '').toString());
+    if (_challengeLoading) return;
+    if (mounted) {
+      setState(() => _challengeLoading = true);
+    }
+    try {
+      final ch = await CabinetApi.instance.fetchChallenge();
+      if (!mounted) return;
+      if (ch == null) {
+        setState(() {
+          _challengeId = '';
+          _challengePowNonce = '';
+          _challengeLoading = false;
+        });
+        return;
+      }
+      final bits = (ch['powBits'] is num) ? (ch['powBits'] as num).toInt() : 16;
+      final prefix = (ch['powPrefix'] ?? '').toString();
+      final nonce = CabinetApi.solvePow(prefix, bits);
+      setState(() {
+        _challengeId = (ch['id'] ?? '').toString();
+        _challengePowNonce = nonce;
+        _challengeLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _challengeId = '';
+        _challengePowNonce = '';
+        _challengeLoading = false;
+      });
+    }
   }
 
   void _setMode(_AuthMode m) {
@@ -62,9 +92,26 @@ class _CabinetAuthScreenState extends State<CabinetAuthScreen> {
       _error = '';
       _ok = '';
       _needTfa = false;
+      _challengeId = '';
+      _challengePowNonce = '';
       _formOpenedAt = DateTime.now().millisecondsSinceEpoch;
     });
     _loadChallenge();
+  }
+
+  bool get _needsBotChallenge =>
+      _mode == _AuthMode.login || _mode == _AuthMode.register || _mode == _AuthMode.forgot;
+
+  Future<Map<String, dynamic>> _botFieldsForSubmit(int opened) async {
+    if (_challengeId.isNotEmpty && _challengePowNonce.isNotEmpty) {
+      return CabinetApi.botFields(
+        formOpenedAt: opened,
+        captchaId: _challengeId,
+        powNonce: _challengePowNonce,
+        pointerEvents: 3,
+      );
+    }
+    return CabinetApi.instance.prepareBotFields(opened);
   }
 
   Future<void> _submit() async {
@@ -84,13 +131,15 @@ class _CabinetAuthScreenState extends State<CabinetAuthScreen> {
       final api = CabinetApi.instance;
       switch (_mode) {
         case _AuthMode.login:
+          final bot = await _botFieldsForSubmit(opened);
           final res = await api.login(
             username: _user.text.trim(),
             password: _pass.text,
             formOpenedAt: opened,
             tfaCode: _tfa.text.trim(),
             rememberMe: _remember,
-            captchaId: _challengeId,
+            captchaId: (bot['captchaId'] ?? '').toString(),
+            powNonce: (bot['powNonce'] ?? '').toString(),
           );
           if (res['need_tfa'] == true) {
             setState(() {
@@ -113,13 +162,15 @@ class _CabinetAuthScreenState extends State<CabinetAuthScreen> {
           widget.onLoggedIn();
           break;
         case _AuthMode.register:
+          final bot = await _botFieldsForSubmit(opened);
           final res = await api.register(
             username: _user.text.trim(),
             password: _pass.text,
             email: _email.text.trim(),
             name: _name.text.trim(),
             formOpenedAt: opened,
-            captchaId: _challengeId,
+            captchaId: (bot['captchaId'] ?? '').toString(),
+            powNonce: (bot['powNonce'] ?? '').toString(),
           );
           setState(() {
             _mode = _AuthMode.verify;
@@ -140,7 +191,7 @@ class _CabinetAuthScreenState extends State<CabinetAuthScreen> {
         case _AuthMode.forgot:
           final u = _user.text.trim();
           final body = <String, dynamic>{
-            ...await api.prepareBotFields(opened),
+            ...await _botFieldsForSubmit(opened),
           };
           if (u.contains('@')) {
             body['email'] = u;
@@ -298,6 +349,67 @@ class _CabinetAuthScreenState extends State<CabinetAuthScreen> {
                     controlAffinity: ListTileControlAffinity.leading,
                   ),
                 ],
+                if (_needsBotChallenge) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xA30F172A),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: DfCabinetTheme.border),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(top: 1),
+                          child: Icon(
+                            _challengeId.isNotEmpty ? Icons.verified_user_outlined : Icons.shield_outlined,
+                            size: 18,
+                            color: _challengeId.isNotEmpty
+                                ? DfCabinetTheme.brass
+                                : DfCabinetTheme.ink.withOpacity(0.7),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _challengeLoading
+                                    ? 'Подготавливаем проверку безопасности...'
+                                    : (_challengeId.isNotEmpty
+                                        ? 'Проверка безопасности выполняется автоматически. Ничего тянуть не нужно.'
+                                        : 'Проверка безопасности не готова. Обновите её перед входом.'),
+                                style: const TextStyle(
+                                  color: DfCabinetTheme.ink,
+                                  fontSize: 12.8,
+                                  fontWeight: FontWeight.w600,
+                                  height: 1.35,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Для нативного клиента DeskForce используется скрытая challenge-проверка без слайдера.',
+                                style: TextStyle(
+                                  color: DfCabinetTheme.ink.withOpacity(0.58),
+                                  fontSize: 11.8,
+                                  height: 1.35,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        TextButton(
+                          onPressed: _challengeLoading ? null : _loadChallenge,
+                          child: const Text('Обновить проверку'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 // Hidden honeypot (bots only)
                 Opacity(
                   opacity: 0,
@@ -324,8 +436,8 @@ class _CabinetAuthScreenState extends State<CabinetAuthScreen> {
                 const SizedBox(height: 14),
                 ElevatedButton(
                   style: DfCabinetTheme.primaryButton(),
-                  onPressed: _busy ? null : _submit,
-                  child: Text(_busy ? '…' : _btn,
+                  onPressed: (_busy || _challengeLoading) ? null : _submit,
+                  child: Text(_busy ? '…' : (_challengeLoading ? 'Подготовка...' : _btn),
                       style: const TextStyle(fontWeight: FontWeight.w700)),
                 ),
                 const SizedBox(height: 12),
