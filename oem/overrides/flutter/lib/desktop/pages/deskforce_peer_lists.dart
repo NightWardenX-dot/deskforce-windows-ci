@@ -172,15 +172,25 @@ class _DeskForcePeerListsState extends State<DeskForcePeerLists> {
     return ListenableBuilder(
       listenable: gFFI.recentPeersModel,
       builder: (context, _) {
-        final peers = gFFI.recentPeersModel.peers.take(8).toList();
-        if (peers.isEmpty) {
-          return _hint(
-            'Здесь появятся устройства, к которым вы уже подключались.',
+        try {
+          final peers = gFFI.recentPeersModel.peers.take(8).toList();
+          if (peers.isEmpty) {
+            return _hint(
+              'Здесь появятся устройства, к которым вы уже подключались.',
+            );
+          }
+          return Column(
+            children: peers.map((p) {
+              try {
+                return _peerTileFromModel(p);
+              } catch (_) {
+                return const SizedBox.shrink();
+              }
+            }).toList(),
           );
+        } catch (_) {
+          return _hint('Не удалось загрузить недавние устройства.');
         }
-        return Column(
-          children: peers.map((p) => _peerTileFromModel(p)).toList(),
-        );
       },
     );
   }
@@ -189,23 +199,38 @@ class _DeskForcePeerListsState extends State<DeskForcePeerLists> {
     return ListenableBuilder(
       listenable: gFFI.favoritePeersModel,
       builder: (context, _) {
-        final peers = gFFI.favoritePeersModel.peers.take(12).toList();
-        if (peers.isEmpty) {
-          return _hint(
-            'Добавляйте устройства в избранное из меню карточки сессии.',
+        try {
+          final peers = gFFI.favoritePeersModel.peers.take(12).toList();
+          if (peers.isEmpty) {
+            return _hint(
+              'Добавляйте устройства в избранное из меню карточки сессии.',
+            );
+          }
+          return Column(
+            children: peers.map((p) {
+              try {
+                return _peerTileFromModel(p);
+              } catch (_) {
+                return const SizedBox.shrink();
+              }
+            }).toList(),
           );
+        } catch (_) {
+          return _hint('Не удалось загрузить избранные.');
         }
-        return Column(
-          children: peers.map((p) => _peerTileFromModel(p)).toList(),
-        );
       },
     );
   }
 
   Widget _buildAddressBook(Color accent) {
     return Obx(() {
-      final logged = DfCabinetSession.to.loggedIn.value ||
-          CabinetApi.instance.isLoggedIn;
+      bool logged = false;
+      try {
+        logged = DfCabinetSession.to.loggedIn.value ||
+            CabinetApi.instance.isLoggedIn;
+      } catch (_) {
+        logged = CabinetApi.instance.isLoggedIn;
+      }
       if (!logged) {
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
@@ -272,26 +297,30 @@ class _DeskForcePeerListsState extends State<DeskForcePeerLists> {
       }
       return Column(
         children: _abPeers.map<Widget>((m) {
-          final id = (m['id'] ?? '').toString();
-          final alias = (m['alias'] ?? '').toString();
-          final hostname = (m['hostname'] ?? '').toString();
-          final username = (m['username'] ?? '').toString();
-          final title = alias.isNotEmpty
-              ? alias
-              : (hostname.isNotEmpty
-                  ? hostname
-                  : (id.isNotEmpty ? formatID(id) : '—'));
-          final subtitle = [
-            if (username.isNotEmpty) username,
-            if (hostname.isNotEmpty && hostname != title) hostname,
-            if (id.isNotEmpty) id,
-          ].join(' · ');
-          return _tile(
-            title: title,
-            subtitle: subtitle,
-            online: null,
-            onTap: id.isEmpty ? null : () => widget.onPickId(id),
-          );
+          try {
+            final id = (m['id'] ?? '').toString();
+            final alias = (m['alias'] ?? '').toString();
+            final hostname = (m['hostname'] ?? '').toString();
+            final username = (m['username'] ?? '').toString();
+            final title = alias.isNotEmpty
+                ? alias
+                : (hostname.isNotEmpty
+                    ? hostname
+                    : (id.isNotEmpty ? formatID(id) : '—'));
+            final subtitle = [
+              if (username.isNotEmpty) username,
+              if (hostname.isNotEmpty && hostname != title) hostname,
+              if (id.isNotEmpty) id,
+            ].join(' · ');
+            return _tile(
+              title: title,
+              subtitle: subtitle,
+              online: null,
+              onTap: id.isEmpty ? null : () => widget.onPickId(id),
+            );
+          } catch (_) {
+            return const SizedBox.shrink();
+          }
         }).toList(),
       );
     });
