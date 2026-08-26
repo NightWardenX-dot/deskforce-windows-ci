@@ -1,4 +1,4 @@
-// DeskForce connect panel — plain TextField + themed recent peers (no RawAutocomplete / PeerTabPage)
+// DeskForce connect panel — plain TextField + themed recent peers (no stock autocomplete overlay)
 
 import 'dart:async';
 import 'dart:convert';
@@ -265,9 +265,8 @@ class _ConnectionPageState extends State<ConnectionPage>
   }
 
   /// UI for the remote ID TextField — DeskForce station connect panel.
-  /// Plain TextField only: RawAutocomplete's OverlayPortal used a tight box for
-  /// all remaining height under the field; on Windows that painted a solid
-  /// #C4C4C2 void under «Подключить устройство». Recent peers are in-tree below.
+  /// Plain TextField only (stock autocomplete overlay reserved a dead panel under
+  /// «Подключить устройство» on Windows). Recent peers are in-tree below.
   Widget _buildRemoteIDTextField(BuildContext context) {
     final ink = Theme.of(context).textTheme.titleLarge?.color ?? MyTheme.dark;
     return Column(
@@ -360,58 +359,61 @@ class _ConnectionPageState extends State<ConnectionPage>
           ),
         ),
         const SizedBox(height: 10),
+        // Do NOT wrap in Obx unless an .obs is read in the builder — empty Obx
+        // throws in release and Flutter paints RenderErrorBox gray (#C0C0C0),
+        // which expands under unbounded Column constraints into a huge slab.
         Align(
           alignment: Alignment.centerRight,
-          child: Obx(() => InkWell(
-                onTapDown: (e) async {
-                  final offset = e.globalPosition;
-                  _menuOpen.value = true;
-                  final x = offset.dx;
-                  final y = offset.dy;
-                  await mod_menu
-                      .showMenu(
-                    context: context,
-                    position: RelativeRect.fromLTRB(x, y, x, y),
-                    items: [
-                      (
-                        'Передать файл',
-                        () => onConnect(isFileTransfer: true)
-                      ),
-                    ]
-                        .map((e) => MenuEntryButton<String>(
-                              childBuilder: (TextStyle? style) => Text(
-                                e.$1,
-                                style: style,
-                              ),
-                              proc: () => e.$2(),
-                              padding: EdgeInsets.symmetric(
-                                  horizontal: kDesktopMenuPadding.left),
-                              dismissOnClicked: true,
-                            ))
-                        .map((e) => e.build(
-                            context,
-                            const MenuConfig(
-                                commonColor: CustomPopupMenuTheme.commonColor,
-                                height: CustomPopupMenuTheme.height,
-                                dividerHeight:
-                                    CustomPopupMenuTheme.dividerHeight)))
-                        .expand((i) => i)
-                        .toList(),
-                    elevation: 8,
-                  )
-                      .then((_) {
-                    _menuOpen.value = false;
-                  });
-                },
-                child: Text(
-                  'Дополнительно',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: ink.withOpacity(0.5),
-                    decoration: TextDecoration.underline,
+          child: InkWell(
+            onTapDown: (e) async {
+              final offset = e.globalPosition;
+              _menuOpen.value = true;
+              final x = offset.dx;
+              final y = offset.dy;
+              await mod_menu
+                  .showMenu(
+                context: context,
+                position: RelativeRect.fromLTRB(x, y, x, y),
+                items: [
+                  (
+                    'Передать файл',
+                    () => onConnect(isFileTransfer: true)
                   ),
-                ),
-              )),
+                ]
+                    .map((e) => MenuEntryButton<String>(
+                          childBuilder: (TextStyle? style) => Text(
+                            e.$1,
+                            style: style,
+                          ),
+                          proc: () => e.$2(),
+                          padding: EdgeInsets.symmetric(
+                              horizontal: kDesktopMenuPadding.left),
+                          dismissOnClicked: true,
+                        ))
+                    .map((e) => e.build(
+                        context,
+                        const MenuConfig(
+                            commonColor: CustomPopupMenuTheme.commonColor,
+                            height: CustomPopupMenuTheme.height,
+                            dividerHeight:
+                                CustomPopupMenuTheme.dividerHeight)))
+                    .expand((i) => i)
+                    .toList(),
+                elevation: 8,
+              )
+                  .then((_) {
+                _menuOpen.value = false;
+              });
+            },
+            child: Text(
+              'Дополнительно',
+              style: TextStyle(
+                fontSize: 14,
+                color: ink.withOpacity(0.5),
+                decoration: TextDecoration.underline,
+              ),
+            ),
+          ),
         ),
         const SizedBox(height: 16),
         _buildRecentPeers(context, ink),

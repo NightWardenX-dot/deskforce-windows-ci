@@ -1,4 +1,5 @@
-// DeskForce mobile connect — AutoSizeTextField + PeerTabPage (no stock autocomplete)
+// DeskForce mobile connect — AutoSizeTextField + themed recent peers
+// (no stock autocomplete overlay / no empty PeerTab fill)
 
 import 'dart:async';
 
@@ -6,7 +7,6 @@ import 'package:auto_size_text_field/auto_size_text_field.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common/deskforce_update.dart';
 import 'package:flutter_hbb/common/formatter/id_formatter.dart';
-import 'package:flutter_hbb/common/widgets/peer_tab_page.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 
@@ -39,6 +39,13 @@ class _ConnectionPageState extends State<ConnectionPage> {
   final TextEditingController _idEditingController = TextEditingController();
   StreamSubscription? _uniLinksSubscription;
 
+  static const _paper = Color(0xFFFBF8F1);
+  static const _panel = Color(0xFFE8E2D4);
+  static const _ink = Color(0xFF12161C);
+  static const _brass = Color(0xFFB8892A);
+  static const _muted = Color(0xFF4A5563);
+  static const _label = Color(0xFF8F6A1C);
+
   _ConnectionPageState() {
     if (!isWeb) _uniLinksSubscription = listenUniLinks();
     _idController.addListener(() {
@@ -68,23 +75,32 @@ class _ConnectionPageState extends State<ConnectionPage> {
       });
     }
     Get.put<TextEditingController>(_idEditingController);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      bind.mainLoadRecentPeers();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     Provider.of<FfiModel>(context);
-    return CustomScrollView(
-      slivers: [
-        SliverList(
-            delegate: SliverChildListDelegate([
-          _buildRemoteIDTextField(),
-        ])),
-        SliverFillRemaining(
-          hasScrollBody: true,
-          child: PeerTabPage(),
-        )
-      ],
-    ).marginOnly(top: 2, left: 10, right: 10);
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(10, 2, 10, 16),
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: kMobilePageConstraints,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildRemoteIDTextField(),
+              const SizedBox(height: 12),
+              _buildRecentPeers(),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void onConnect() {
@@ -102,14 +118,14 @@ class _ConnectionPageState extends State<ConnectionPage> {
   }
 
   Widget _buildRemoteIDTextField() {
-    final w = SizedBox(
+    return SizedBox(
       height: 84,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
         child: Ink(
           decoration: BoxDecoration(
             color: Theme.of(context).cardColor,
-            borderRadius: BorderRadius.all(Radius.circular(13)),
+            borderRadius: const BorderRadius.all(Radius.circular(13)),
           ),
           child: Row(
             children: <Widget>[
@@ -130,7 +146,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
                       fontFamily: 'WorkSans',
                       fontWeight: FontWeight.bold,
                       fontSize: 30,
-                      color: Color(0xFF8F6A1C),
+                      color: _label,
                     ),
                     decoration: InputDecoration(
                       labelText: translate('Remote ID'),
@@ -139,7 +155,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
                         fontWeight: FontWeight.w600,
                         fontSize: 16,
                         letterSpacing: 0.2,
-                        color: Color(0xFF4A5563),
+                        color: _muted,
                       ),
                     ),
                     inputFormatters: [IDTextInputFormatter()],
@@ -158,14 +174,14 @@ class _ConnectionPageState extends State<ConnectionPage> {
                             _idEditingController.clear();
                           });
                         },
-                        icon: const Icon(Icons.clear, color: Color(0xFF4A5563))),
+                        icon: const Icon(Icons.clear, color: _muted)),
                   )),
               SizedBox(
                 width: 60,
                 height: 60,
                 child: IconButton(
                   icon: const Icon(Icons.arrow_forward,
-                      color: Color(0xFFB8892A), size: 45),
+                      color: _brass, size: 45),
                   onPressed: onConnect,
                 ),
               ),
@@ -174,9 +190,97 @@ class _ConnectionPageState extends State<ConnectionPage> {
         ),
       ),
     );
-    return Align(
-        alignment: Alignment.topCenter,
-        child: Container(constraints: kMobilePageConstraints, child: w));
+  }
+
+  Widget _buildRecentPeers() {
+    return ListenableBuilder(
+      listenable: gFFI.recentPeersModel,
+      builder: (context, _) {
+        final peers = gFFI.recentPeersModel.peers.take(6).toList();
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+          decoration: BoxDecoration(
+            color: _panel,
+            borderRadius: BorderRadius.circular(3),
+            border: Border.all(color: const Color(0x3312161C)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'НЕДАВНИЕ',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.2,
+                  color: _label,
+                ),
+              ),
+              const SizedBox(height: 8),
+              if (peers.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 10),
+                  child: Text(
+                    'Здесь появятся устройства, к которым вы уже подключались.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      height: 1.35,
+                      color: Color(0x8012161C),
+                    ),
+                  ),
+                )
+              else
+                ...peers.map((peer) {
+                  final title = peer.alias.isNotEmpty
+                      ? peer.alias
+                      : (peer.id.isNotEmpty ? formatID(peer.id) : '—');
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Material(
+                      color: _paper,
+                      borderRadius: BorderRadius.circular(3),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(3),
+                        onTap: () {
+                          setState(() {
+                            _idController.id = peer.id;
+                            _idEditingController.text = formatID(peer.id);
+                          });
+                          onConnect();
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: _ink,
+                                  ),
+                                ),
+                              ),
+                              const Icon(Icons.chevron_right,
+                                  size: 18, color: _label),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override

@@ -1615,10 +1615,12 @@ def patch_mobile_connection_page(src: pathlib.Path, app_name: str) -> None:
         or "widgets/autocomplete.dart" in content
     )
     deskforce_ok = (
-        "PeerTabPage" in content
+        "DeskForce mobile connect" in content
+        and "НЕДАВНИЕ" in content
         and "RawAutocomplete<" not in content
         and "_allPeersLoader" not in content
-        and "DeskForce mobile connect" in content
+        and "PeerTabPage" not in content
+        and "SliverFillRemaining" not in content
     )
     if deskforce_ok and not stockish:
         print("OK already: mobile connection_page.dart")
@@ -1645,9 +1647,14 @@ def patch_mobile_connection_page(src: pathlib.Path, app_name: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(override, path)
     text = path.read_text(encoding="utf-8", errors="ignore")
-    if "RawAutocomplete<" in text or "_allPeersLoader" in text:
+    if (
+        "RawAutocomplete<" in text
+        or "_allPeersLoader" in text
+        or "PeerTabPage" in text
+        or "SliverFillRemaining" in text
+    ):
         print(
-            "ERROR: mobile connection_page override still contains RawAutocomplete",
+            "ERROR: mobile connection_page override still has autocomplete/PeerTab fill",
             file=sys.stderr,
         )
         raise SystemExit(1)
