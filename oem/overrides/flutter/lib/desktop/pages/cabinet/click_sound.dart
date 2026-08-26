@@ -16,6 +16,13 @@ Future<void> dfSetClickSoundEnabled(bool value) async {
 
 File? _cachedWav;
 
+String _windowsPowerShell() {
+  const full =
+      r'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe';
+  if (File(full).existsSync()) return full;
+  return 'powershell';
+}
+
 /// Soft UI click — default OFF. Plays bundled wav when enabled.
 Future<void> dfPlayClickSound() async {
   if (!dfClickSoundEnabled()) return;
@@ -23,21 +30,29 @@ Future<void> dfPlayClickSound() async {
     _cachedWav ??= await _ensureWav();
     final path = _cachedWav!.path;
     if (Platform.isWindows) {
+      // SoundPlayer.Play() returns immediately; a detached powershell would
+      // exit and tear down async playback → silence. PlaySync keeps it alive.
       final escaped = path.replaceAll("'", "''");
       await Process.start(
-        'powershell',
+        _windowsPowerShell(),
         [
           '-NoProfile',
           '-NonInteractive',
           '-WindowStyle',
           'Hidden',
           '-Command',
-          "(New-Object Media.SoundPlayer '$escaped').Play()",
+          "(New-Object Media.SoundPlayer '$escaped').PlaySync()",
         ],
         mode: ProcessStartMode.detached,
         runInShell: false,
       );
       return;
+    }
+    if (Platform.isMacOS) {
+      try {
+        final r = await Process.run('afplay', [path]);
+        if (r.exitCode == 0) return;
+      } catch (_) {}
     }
     if (Platform.isLinux) {
       for (final cmd in [
