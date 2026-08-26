@@ -128,6 +128,7 @@ class DeskForceUpdateInfo {
     required this.mandatory,
     required this.releaseNotes,
     required this.available,
+    this.updateAvailable,
   });
 
   final String platform;
@@ -136,6 +137,8 @@ class DeskForceUpdateInfo {
   final bool mandatory;
   final String releaseNotes;
   final bool available;
+  /// Server-side compare result when client sent ?version= (null = unknown).
+  final bool? updateAvailable;
 
   bool get hasDownload =>
       available && downloadUrl.isNotEmpty && _isAllowedUrl(downloadUrl);
@@ -150,15 +153,15 @@ bool _isAllowedUrl(String url) {
 
 /// Pad to major.minor.patch so 1.0 and 1.0.0 compare equal.
 String dfNormalizeVersion(String v) {
-  final main = v.split('-').first.trim();
-  final parts = main.split('.').where((p) => p.isNotEmpty).toList();
+  final core = v.split('+').first.split('-').first.trim();
+  final parts = core.split('.').where((p) => p.isNotEmpty).toList();
   while (parts.length < 3) {
     parts.add('0');
   }
   return parts.take(3).join('.');
 }
 
-/// Numeric compare aligned with RustDesk get_version_number.
+/// Core numeric (RustDesk-style) for major.minor.patch only — ignores prerelease.
 int dfVersionNumber(String v) {
   final main = dfNormalizeVersion(v);
   var n = 0;
@@ -169,15 +172,48 @@ int dfVersionNumber(String v) {
   }
   n -= last;
   n += last * 10;
-  final dash = v.split('-');
-  if (dash.length > 1) {
-    n += int.tryParse(dash[1].split(RegExp(r'[^0-9]')).first) ?? 0;
-  }
   return n;
 }
 
+/// Prerelease segment after first `-` and before `+` (empty = release).
+String dfPrerelease(String v) {
+  final noBuild = v.split('+').first.trim();
+  final i = noBuild.indexOf('-');
+  if (i < 0 || i + 1 >= noBuild.length) return '';
+  return noBuild.substring(i + 1);
+}
+
+int _cmpIdent(String a, String b) {
+  final ai = int.tryParse(a);
+  final bi = int.tryParse(b);
+  if (ai != null && bi != null) return ai.compareTo(bi);
+  if (ai != null) return -1; // numeric < non-numeric (semver)
+  if (bi != null) return 1;
+  return a.compareTo(b);
+}
+
+/// Semver compare with prerelease: 1.2.0-beta.3 < 1.2.0-beta.4 < 1.2.0.
+/// Returns negative if a<b, 0 if equal, positive if a>b.
+int dfCompareVersions(String a, String b) {
+  final core = dfVersionNumber(a).compareTo(dfVersionNumber(b));
+  if (core != 0) return core;
+  final pa = dfPrerelease(a);
+  final pb = dfPrerelease(b);
+  if (pa.isEmpty && pb.isEmpty) return 0;
+  if (pa.isEmpty) return 1; // release > prerelease
+  if (pb.isEmpty) return -1;
+  final aa = pa.split('.');
+  final bb = pb.split('.');
+  final n = aa.length < bb.length ? aa.length : bb.length;
+  for (var i = 0; i < n; i++) {
+    final c = _cmpIdent(aa[i], bb[i]);
+    if (c != 0) return c;
+  }
+  return aa.length.compareTo(bb.length);
+}
+
 bool dfIsNewerVersion(String remote, String local) =>
-    dfVersionNumber(remote) > dfVersionNumber(local);
+    dfCompareVersions(remote, local) > 0;
 
 String dfCurrentPlatformKey() {
   if (Platform.isWindows) return 'windows';
@@ -187,11 +223,18 @@ String dfCurrentPlatformKey() {
   return 'windows';
 }
 
-Future<DeskForceUpdateInfo?> dfFetchUpdateInfo({String? platform}) async {
+Future<DeskForceUpdateInfo?> dfFetchUpdateInfo({
+  String? platform,
+  String? localVersion,
+}) async {
   final plat = platform ?? dfCurrentPlatformKey();
   // Prefer API (platform slice); fall back to static update.json.
   try {
-    final api = Uri.parse('$kDfUpdateApiUrl?platform=$plat');
+    final q = <String, String>{'platform': plat};
+    if (localVersion != null && localVersion.trim().isNotEmpty) {
+      q['version'] = localVersion.trim();
+    }
+    final api = Uri.parse(kDfUpdateApiUrl).replace(queryParameters: q);
     final resp = await http.get(api).timeout(const Duration(seconds: 8));
     if (resp.statusCode == 200) {
       final map = jsonDecode(utf8.decode(resp.bodyBytes));
@@ -235,6 +278,10 @@ DeskForceUpdateInfo? _parsePlatform(Map<String, dynamic> map, String plat) {
     // Refuse any non-DeskForce host.
     url = '';
   }
+  bool? updateAvail;
+  if (map.containsKey('update_available')) {
+    updateAvail = map['update_available'] == true;
+  }
   return DeskForceUpdateInfo(
     platform: '${map['platform'] ?? plat}',
     version: version,
@@ -242,6 +289,7 @@ DeskForceUpdateInfo? _parsePlatform(Map<String, dynamic> map, String plat) {
     mandatory: map['mandatory'] == true,
     releaseNotes: '${map['release_notes'] ?? ''}'.trim(),
     available: map['available'] != false,
+    updateAvailable: updateAvail,
   );
 }
 
@@ -303,12 +351,19 @@ Future<void> dfDownloadAndExecute(BuildContext context, String url) async {
 }
 
 /// Silent startup check: non-intrusive banner when a newer build is available.
+bool dfUpdateNeeded(DeskForceUpdateInfo info, String local) {
+  // Prefer server decision when present (helps older clients after API fixes).
+  // Otherwise fall back to local semver compare (incl. 1.2.0-beta.N).
+  if (info.updateAvailable != null) return info.updateAvailable!;
+  return dfIsNewerVersion(info.version, local);
+}
+
 Future<void> dfCheckUpdateOnStartup(BuildContext context) async {
   try {
     final local = await dfLocalAppVersion();
-    final info = await dfFetchUpdateInfo();
+    final info = await dfFetchUpdateInfo(localVersion: local);
     if (info == null || !info.hasDownload) return;
-    if (!dfIsNewerVersion(info.version, local)) return;
+    if (!dfUpdateNeeded(info, local)) return;
     if (!context.mounted) return;
     await dfShowUpdateBannerIfNeeded(context, info, local);
   } catch (e) {
@@ -344,14 +399,14 @@ Future<void> dfCheckUpdateManual(BuildContext context) async {
   );
   try {
     final local = await dfLocalAppVersion();
-    final info = await dfFetchUpdateInfo();
+    final info = await dfFetchUpdateInfo(localVersion: local);
     if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
     if (!context.mounted) return;
     if (info == null || !info.hasDownload) {
       await _toast(context, 'Не удалось проверить обновления. Попробуйте позже.');
       return;
     }
-    if (!dfIsNewerVersion(info.version, local)) {
+    if (!dfUpdateNeeded(info, local)) {
       await _toast(context, 'У вас актуальная версия DeskForce ($local).');
       return;
     }
