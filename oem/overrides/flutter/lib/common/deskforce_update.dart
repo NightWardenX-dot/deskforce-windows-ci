@@ -381,18 +381,18 @@ Future<void> _applyWindowsPortableUpdate(String zipUrl) async {
   await unpack.create(recursive: true);
 
   final ps = '''
-$ErrorActionPreference = 'Stop'
+\$ErrorActionPreference = 'Stop'
 Start-Sleep -Milliseconds 1200
-$zip = '${_psQuote(zipPath)}'
-$src = '${_psQuote(unpackDir)}'
-$dest = '${_psQuote(currentDir)}'
-$exe = '${_psQuote(currentExe)}'
-Expand-Archive -Path $zip -DestinationPath $src -Force
-for ($i = 0; $i -lt 80; $i++) {
+\$zip = '${_psQuote(zipPath)}'
+\$src = '${_psQuote(unpackDir)}'
+\$dest = '${_psQuote(currentDir)}'
+\$exe = '${_psQuote(currentExe)}'
+Expand-Archive -Path \$zip -DestinationPath \$src -Force
+for (\$i = 0; \$i -lt 80; \$i++) {
   try {
-    Copy-Item -Path (Join-Path $src '*') -Destination $dest -Recurse -Force -ErrorAction Stop
+    Copy-Item -Path (Join-Path \$src '*') -Destination \$dest -Recurse -Force -ErrorAction Stop
     Start-Sleep -Milliseconds 250
-    Start-Process -FilePath $exe
+    Start-Process -FilePath \$exe
     exit 0
   } catch {
     Start-Sleep -Milliseconds 500
