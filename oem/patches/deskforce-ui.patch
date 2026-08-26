@@ -444,10 +444,10 @@ index e5fa7fb..a2f4619 100644
 -    !isWeb && bind.mainGetLocalOption(key: "disable-discovery-panel") != "Y",
 -    !(bind.isDisableAb() || bind.isDisableAccount()),
 -    !(bind.isDisableGroupPanel() || bind.isDisableAccount()),
-+    false, // recent — DeskForce simplified UI
-+    false, // favorites
++    false, // recent — DeskForcePeerLists
++    false, // favorites — DeskForcePeerLists
 +    false, // discovered / LAN
-+    false, // address book
++    true, // address book
 +    false, // accessible devices / group
    ]);
    final List<bool> _isVisible = List.filled(maxTabCount, true, growable: false);
@@ -532,7 +532,7 @@ index 3e23770..10e604b 100644
 +    drop(bi);
 +
 +    let mut hard = HARD_SETTINGS.write().unwrap();
-+    hard.insert("disable-ab".into(), "Y".into());
++    // disable-ab intentionally omitted — AB restored in DeskForce UI
 +    hard.insert("disable-account".into(), "Y".into());
 +    drop(hard);
 +

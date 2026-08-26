@@ -1,8 +1,11 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet/cabinet_api.dart';
 import 'package:flutter_hbb/common.dart';
+import 'package:flutter_hbb/models/ab_model.dart';
+import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:get/get.dart';
 
 /// Shared cabinet session — surfaces license, devices, tickets on the main UI.
@@ -146,6 +149,7 @@ class DfCabinetSession extends GetxController {
       openTickets.value = tickets;
       localDeviceId.value = localId;
       localIdLinked.value = linked;
+      await _syncRustdeskAbAuth(active: true);
     } catch (e) {
       debugPrint('DfCabinetSession.refresh: $e');
       lastError.value = e.toString();
@@ -201,6 +205,8 @@ class DfCabinetSession extends GetxController {
   }
 
   void _clear() {
+    // ignore: unawaited_futures
+    _syncRustdeskAbAuth(active: false);
     loggedIn.value = false;
     username.value = '';
     displayName.value = '';

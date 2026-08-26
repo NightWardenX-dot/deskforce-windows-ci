@@ -268,7 +268,8 @@ pub fn apply_deskforce_oem() {{
     drop(bi);
 
     let mut hard = HARD_SETTINGS.write().unwrap();
-    hard.insert("disable-ab".into(), "Y".into());
+    // Address book enabled — UI via DeskForcePeerLists + cabinet-api bridge.
+    // hard.insert("disable-ab".into(), "Y".into());
     hard.insert("disable-account".into(), "Y".into());
     // Portable EXE: skip stock "Install" tip when service not registered.
     hard.insert("disable-installation".into(), "Y".into());
@@ -539,10 +540,10 @@ def patch_peer_tabs(src: pathlib.Path) -> None:
         return
     text = path.read_text(encoding="utf-8", errors="ignore")
     new_enabled = """  List<bool> isEnabled = List.from([
-    false, // recent — DeskForce simplified UI
-    false, // favorites
-    false, // discovered / LAN
-    false, // address book
+    false, // recent — shown in DeskForcePeerLists
+    false, // favorites — shown in DeskForcePeerLists
+    false, // discovered / LAN — DeskForce LAN panel / agent
+    true, // address book — DeskForcePeerLists + stock AB when account bridged
     false, // accessible devices / group
   ]);"""
     text2 = re.sub(
@@ -554,7 +555,7 @@ def patch_peer_tabs(src: pathlib.Path) -> None:
     if text2 == text:
         print("WARN: peer_tab isEnabled not patched", file=sys.stderr)
     else:
-        print("Patched: peer_tab_model isEnabled (all hidden)")
+        print("Patched: peer_tab_model isEnabled (AB on, others via DeskForce UI)")
         path.write_text(text2, encoding="utf-8")
 
 
