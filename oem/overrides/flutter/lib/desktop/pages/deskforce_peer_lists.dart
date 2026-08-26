@@ -34,7 +34,7 @@ class _DeskForcePeerListsState extends State<DeskForcePeerLists> {
 
   static const _brass = Color(0xFF2DD4BF);
   static const _panel = Color(0xFF0C1422);
-  static const _tile = Color(0xFF111827);
+  static const _tileBg = Color(0xFF111827);
 
   @override
   void initState() {
@@ -271,7 +271,7 @@ class _DeskForcePeerListsState extends State<DeskForcePeerLists> {
         );
       }
       return Column(
-        children: _abPeers.map((m) {
+        children: _abPeers.map<Widget>((m) {
           final id = (m['id'] ?? '').toString();
           final alias = (m['alias'] ?? '').toString();
           final hostname = (m['hostname'] ?? '').toString();
@@ -336,7 +336,7 @@ class _DeskForcePeerListsState extends State<DeskForcePeerLists> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Material(
-        color: _tile,
+        color: _tileBg,
         borderRadius: BorderRadius.circular(10),
         child: InkWell(
           borderRadius: BorderRadius.circular(10),
