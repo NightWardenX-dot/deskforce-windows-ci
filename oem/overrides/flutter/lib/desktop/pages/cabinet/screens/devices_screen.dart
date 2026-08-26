@@ -126,7 +126,7 @@ class _CabinetDevicesScreenState extends State<CabinetDevicesScreen> {
               Expanded(
                 child: DfCabinetTheme.heading('Устройства',
                     subtitle:
-                        'Привязанные клиенты. Офлайн-устройства можно удалить.'),
+                        'Привязанные клиенты. Неактивные (офлайн) удаляйте кнопкой «Удалить».'),
               ),
               IconButton(
                 tooltip: 'Обновить',
@@ -238,30 +238,61 @@ class _CabinetDevicesScreenState extends State<CabinetDevicesScreen> {
                                               : DfCabinetTheme.ink
                                                   .withOpacity(0.45)),
                                     ),
-                                    const SizedBox(width: 8),
-                                    IconButton(
-                                      tooltip: canDelete
-                                          ? 'Удалить'
-                                          : 'Сначала отключите устройство',
-                                      onPressed: (!canDelete || busy)
-                                          ? null
-                                          : dfClickWrap(() => _delete(d)),
-                                      icon: busy
-                                          ? const SizedBox(
-                                              width: 18,
-                                              height: 18,
-                                              child:
-                                                  CircularProgressIndicator(
-                                                      strokeWidth: 2,
-                                                      color: DfCabinetTheme
-                                                          .brass),
-                                            )
-                                          : Icon(Icons.delete_outline,
-                                              color: canDelete
-                                                  ? DfCabinetTheme.danger
-                                                  : DfCabinetTheme.ink
-                                                      .withOpacity(0.25)),
-                                    ),
+                                    const SizedBox(width: 10),
+                                    if (busy)
+                                      const SizedBox(
+                                        width: 22,
+                                        height: 22,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: DfCabinetTheme.brass,
+                                        ),
+                                      )
+                                    else if (canDelete)
+                                      TextButton.icon(
+                                        onPressed:
+                                            dfClickWrap(() => _delete(d)),
+                                        icon: const Icon(
+                                          Icons.delete_outline,
+                                          size: 18,
+                                          color: DfCabinetTheme.danger,
+                                        ),
+                                        label: const Text(
+                                          'Удалить',
+                                          style: TextStyle(
+                                            color: DfCabinetTheme.danger,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        style: TextButton.styleFrom(
+                                          foregroundColor:
+                                              DfCabinetTheme.danger,
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 10, vertical: 8),
+                                        ),
+                                      )
+                                    else
+                                      Tooltip(
+                                        message:
+                                            'Сначала отключите устройство',
+                                        child: TextButton.icon(
+                                          onPressed: null,
+                                          icon: Icon(
+                                            Icons.delete_outline,
+                                            size: 18,
+                                            color: DfCabinetTheme.ink
+                                                .withOpacity(0.25),
+                                          ),
+                                          label: Text(
+                                            'Удалить',
+                                            style: TextStyle(
+                                              color: DfCabinetTheme.ink
+                                                  .withOpacity(0.35),
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
                                   ],
                                 ),
                               );
