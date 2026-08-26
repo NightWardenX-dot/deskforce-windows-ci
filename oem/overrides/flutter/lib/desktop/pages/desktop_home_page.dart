@@ -1247,14 +1247,15 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     }
   }
 
-  /// DeskForce: one serialized startup pass (main.dart may already run it).
-  /// A single delayed force-retry covers Windows restoring pre-maximize size
-  /// after the first Flutter frame — never overlap concurrent window APIs.
+  /// DeskForce: one serialized startup pass only (main.dart may already run it).
+  /// Do NOT force-retry maximize/setSize — that re-touched HWND after first paint
+  /// and contributed to beta.13–15 native crashes on some DPI setups.
   Future<void> _ensureDeskForceWindowSize() async {
-    await dfApplyStartupWindowBehavior();
-    await Future.delayed(const Duration(milliseconds: 350));
-    if (!mounted) return;
-    await dfApplyStartupWindowBehavior(force: true);
+    try {
+      await dfApplyStartupWindowBehavior();
+    } catch (e) {
+      debugPrint('ensureDeskForceWindowSize: $e');
+    }
   }
 
   @override

@@ -13,18 +13,25 @@ const kDfAutostart = 'df-autostart';
 const kDfStartInTray = 'df-start-in-tray';
 const kDfStartFullscreen = 'df-start-fullscreen';
 
-/// Serialize window ops — beta.14 crashed when main.dart + home page
-/// called maximize/setSize concurrently (3 overlapping runs).
+/// Serialize all startup window ops (beta.13–15 native crashes from concurrent
+/// maximize/setSize/setFullScreen across main.dart + home page).
 Future<void>? _dfStartupWindowInFlight;
 bool _dfStartupWindowDone = false;
 
 bool dfLocalBool(String key) =>
     bind.mainGetLocalOption(key: key) == 'Y';
 
-/// True when option is Y, or unset (DeskForce default ON for maximized start).
+/// True when option is Y, or unset (legacy helper — prefer explicit defaults).
 bool dfLocalBoolDefaultOn(String key) {
   final v = bind.mainGetLocalOption(key: key);
   if (v.isEmpty) return true;
+  return v == 'Y';
+}
+
+/// True only when explicitly Y (unset = OFF). Used for maximize-on-start.
+bool dfLocalBoolDefaultOff(String key) {
+  final v = bind.mainGetLocalOption(key: key);
+  if (v.isEmpty) return false;
   return v == 'Y';
 }
 
@@ -52,14 +59,15 @@ Future<bool> dfSetWindowsAutostart(bool enable) async {
     final dir = Directory(lnk).parent;
     if (!await dir.exists()) await dir.create(recursive: true);
     final workDir = File(exe).parent.path.replaceAll("'", "''");
-    final ps = '''
-\$ws = New-Object -ComObject WScript.Shell
-\$s = \$ws.CreateShortcut('$lnk')
-\$s.TargetPath = '$exe'
-\$s.WorkingDirectory = '$workDir'
-\$s.Description = 'DeskForce'
-\$s.Save()
-''';
+    // Keep PowerShell vars as real $ — written literally below via r-string segment.
+    final ps = r"""
+$ws = New-Object -ComObject WScript.Shell
+$s = $ws.CreateShortcut('""" + lnk + r"""')
+$s.TargetPath = '""" + exe + r"""'
+$s.WorkingDirectory = '""" + workDir + r"""'
+$s.Description = 'DeskForce'
+$s.Save()
+""";
     final r = await Process.run(
       'powershell',
       ['-NoProfile', '-NonInteractive', '-Command', ps],
@@ -103,24 +111,25 @@ Future<Size> _workAreaSize() async {
 }
 
 Future<void> _applySafeMinSize(Size work) async {
-  // Never force a min size larger than the work area (beta.13 clip).
-  final minW = math.min(480.0, math.max(320.0, work.width * 0.45));
-  final minH = math.min(360.0, math.max(240.0, work.height * 0.45));
+  // Never force a min size larger than the work area (beta.13 clip/crash).
+  final minW = math.min(400.0, math.max(280.0, work.width * 0.40));
+  final minH = math.min(300.0, math.max(200.0, work.height * 0.40));
   try {
     await windowManager.setMinimumSize(Size(minW, minH));
-  } catch (_) {}
+  } catch (e) {
+    debugPrint('setMinimumSize failed: $e');
+  }
 }
 
+/// Soft maximize — never exclusive fullscreen. Any failure → false.
 Future<bool> _tryMaximizeOnce() async {
   try {
-    // Never call setFullScreen during startup — exclusive FS + maximize races
-    // crash window_manager / desktop_multi_window on some DPI setups (beta.14).
     if (await windowManager.isMaximized()) {
       stateGlobal.setMaximized(true);
       return true;
     }
     await windowManager.maximize();
-    await Future.delayed(const Duration(milliseconds: 80));
+    await Future.delayed(const Duration(milliseconds: 60));
     final ok = await windowManager.isMaximized();
     if (ok) stateGlobal.setMaximized(true);
     return ok;
@@ -130,14 +139,24 @@ Future<bool> _tryMaximizeOnce() async {
   }
 }
 
+/// Fit a safe normal window inside the work area (high-DPI / small laptop safe).
 Future<void> _fitWorkArea(Size work) async {
-  final w = math.max(480.0, math.min(work.width * 0.92, work.width - 16));
-  final h = math.max(360.0, math.min(work.height * 0.92, work.height - 16));
+  final maxW = math.max(320.0, work.width - 24);
+  final maxH = math.max(240.0, work.height - 24);
+  final w = math.min(maxW, math.max(480.0, work.width * 0.82));
+  final h = math.min(maxH, math.max(360.0, work.height * 0.82));
+  final safeW = math.min(w, maxW);
+  final safeH = math.min(h, maxH);
   try {
-    await windowManager.setSize(Size(w, h));
+    await windowManager.setSize(Size(safeW, safeH));
+    await Future.delayed(const Duration(milliseconds: 30));
     await windowManager.setAlignment(Alignment.center);
   } catch (e) {
     debugPrint('fitWorkArea failed: $e');
+    try {
+      await windowManager.setSize(const Size(640, 480));
+      await windowManager.setAlignment(Alignment.center);
+    } catch (_) {}
   }
 }
 
@@ -147,7 +166,9 @@ Future<void> _applyStartupWindowBehaviorImpl({required bool force}) async {
     await _applySafeMinSize(work);
 
     if (dfLocalBool(kDfStartInTray)) {
-      await windowManager.hide();
+      try {
+        await windowManager.hide();
+      } catch (_) {}
       _dfStartupWindowDone = true;
       return;
     }
@@ -155,31 +176,36 @@ Future<void> _applyStartupWindowBehaviorImpl({required bool force}) async {
     try {
       await windowManager.show();
       await windowManager.focus();
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('show/focus failed: $e');
+    }
 
-    if (dfLocalBoolDefaultOn(kDfStartFullscreen)) {
-      if (await _tryMaximizeOnce()) {
-        _dfStartupWindowDone = true;
-        return;
+    // beta.16: maximize-on-start is OPT-IN only (unset = OFF).
+    // Never call setFullScreen during startup — exclusive FS crashed Win
+    // window_manager / desktop_multi_window on some DPI setups (beta.13–15).
+    if (dfLocalBoolDefaultOff(kDfStartFullscreen)) {
+      if (!await _tryMaximizeOnce()) {
+        await _fitWorkArea(work);
       }
-      await Future.delayed(const Duration(milliseconds: 120));
-      if (await _tryMaximizeOnce()) {
-        _dfStartupWindowDone = true;
-        return;
-      }
-      await _fitWorkArea(work);
       _dfStartupWindowDone = true;
       return;
     }
 
+    // Default path: safe normal window fitting work area.
     await _fitWorkArea(work);
     _dfStartupWindowDone = true;
-  } catch (e) {
-    debugPrint('startup window behavior: $e');
+  } catch (e, st) {
+    debugPrint('startup window behavior: $e\n$st');
+    try {
+      await windowManager.setMinimumSize(const Size(320, 240));
+      await windowManager.setSize(const Size(800, 600));
+      await windowManager.show();
+    } catch (_) {}
+    _dfStartupWindowDone = true;
   }
 }
 
-/// Concurrent callers share one in-flight Future (beta.14 native crash fix).
+/// Concurrent callers share one in-flight Future.
 Future<void> dfApplyStartupWindowBehavior({bool force = false}) async {
   if (!force && _dfStartupWindowDone) return;
   if (_dfStartupWindowInFlight != null) {

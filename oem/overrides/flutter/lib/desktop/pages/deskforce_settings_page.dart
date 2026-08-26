@@ -27,7 +27,7 @@ class _DeskForceSettingsPageState extends State<DeskForceSettingsPage> {
 
   bool _autostart = false;
   bool _startTray = false;
-  bool _startFs = true; // default ON
+  bool _startFs = false; // default OFF (beta.16 safe start)
   bool _clickSound = false; // default OFF
   bool _hideOnLan = false; // Deny LAN discovery → enable-lan-discovery = N
   bool _busy = false;
@@ -45,7 +45,7 @@ class _DeskForceSettingsPageState extends State<DeskForceSettingsPage> {
     setState(() {
       _autostart = auto || dfLocalBool(kDfAutostart);
       _startTray = dfLocalBool(kDfStartInTray);
-      _startFs = dfLocalBoolDefaultOn(kDfStartFullscreen);
+      _startFs = dfLocalBoolDefaultOff(kDfStartFullscreen);
       _clickSound = dfClickSoundEnabled();
       _hideOnLan = !lanEnabled;
     });
@@ -115,7 +115,7 @@ class _DeskForceSettingsPageState extends State<DeskForceSettingsPage> {
             _toggle(
               title: 'Полноэкранный режим при запуске',
               subtitle:
-                  'Разворачивать главное окно на весь экран при открытии (по умолчанию включено)',
+                  'Разворачивать главное окно при открытии (по умолчанию выключено — безопасный старт)',
               value: _startFs,
               onChanged: (v) async {
                 await dfSetLocalBool(kDfStartFullscreen, v);
