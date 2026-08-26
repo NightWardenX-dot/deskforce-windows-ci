@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
+
 import 'package:flutter_hbb/desktop/pages/cabinet/cabinet_errors.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:http/http.dart' as http;
@@ -125,14 +127,59 @@ class CabinetApi {
     required int formOpenedAt,
     String captchaId = '',
     String code = '',
+    String powNonce = '',
+    int pointerEvents = 1,
   }) =>
       {
         'notRobot': true,
         'honeypot': '',
+        'honeypot2': '',
         'formOpenedAt': formOpenedAt,
         'captchaId': captchaId,
         'code': code,
+        'powNonce': powNonce,
+        'pointerEvents': pointerEvents,
       };
+
+  /// Solve SHA-256 PoW issued by /auth/challenge (native clients have no slider).
+  static String solvePow(String prefix, int bits) {
+    if (prefix.isEmpty || bits < 1) return '0';
+    for (var i = 0; i < 5000000; i++) {
+      final nonce = '$i';
+      final digest = sha256.convert(utf8.encode('$prefix:$nonce'));
+      if (_leadingZeroBits(digest.bytes) >= bits) return nonce;
+    }
+    return '0';
+  }
+
+  static int _leadingZeroBits(List<int> bytes) {
+    var n = 0;
+    for (final b in bytes) {
+      for (var i = 7; i >= 0; i--) {
+        if ((b & (1 << i)) == 0) {
+          n++;
+        } else {
+          return n;
+        }
+      }
+    }
+    return n;
+  }
+
+  /// Fetch challenge and return bot fields ready for auth POST.
+  Future<Map<String, dynamic>> prepareBotFields(int formOpenedAt) async {
+    final ch = await fetchChallenge();
+    final captchaId = (ch?['id'] ?? '').toString();
+    final bits = (ch?['powBits'] is num) ? (ch!['powBits'] as num).toInt() : 16;
+    final prefix = (ch?['powPrefix'] ?? '').toString();
+    final nonce = solvePow(prefix, bits);
+    return botFields(
+      formOpenedAt: formOpenedAt,
+      captchaId: captchaId,
+      powNonce: nonce,
+      pointerEvents: 3,
+    );
+  }
 
   Future<Map<String, dynamic>?> fetchChallenge() async {
     try {
@@ -154,13 +201,25 @@ class CabinetApi {
     String tfaCode = '',
     bool rememberMe = true,
     String captchaId = '',
+    String powNonce = '',
   }) async {
+    Map<String, dynamic> bot;
+    if (powNonce.isNotEmpty && captchaId.isNotEmpty) {
+      bot = botFields(
+        formOpenedAt: formOpenedAt,
+        captchaId: captchaId,
+        powNonce: powNonce,
+        pointerEvents: 3,
+      );
+    } else {
+      bot = await prepareBotFields(formOpenedAt);
+    }
     final data = await post('/auth/login', auth: false, body: {
       'username': username,
       'password': password,
       'tfaCode': tfaCode,
       'rememberMe': rememberMe,
-      ...botFields(formOpenedAt: formOpenedAt, captchaId: captchaId),
+      ...bot,
     });
     final map = Map<String, dynamic>.from(data as Map);
     final token = (map['token'] ?? '').toString();
@@ -176,12 +235,13 @@ class CabinetApi {
     String name = '',
     String captchaId = '',
   }) async {
+    final bot = await prepareBotFields(formOpenedAt);
     final data = await post('/auth/register', auth: false, body: {
       'username': username,
       'password': password,
       'email': email,
       'name': name,
-      ...botFields(formOpenedAt: formOpenedAt, captchaId: captchaId),
+      ...bot,
     });
     return Map<String, dynamic>.from(data as Map? ?? {});
   }

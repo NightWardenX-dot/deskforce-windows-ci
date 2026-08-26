@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet/cabinet_api.dart';
+import 'package:flutter_hbb/desktop/pages/cabinet/cabinet_session.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet/cabinet_theme.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet/click_sound.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet/screens/auth_screen.dart';
@@ -47,8 +48,12 @@ class _DeskForceCabinetPageState extends State<DeskForceCabinetPage> {
   @override
   void initState() {
     super.initState();
+    DfCabinetSession.ensure();
     _section = cabinetSectionFromUrl(widget.initialUrl);
     _loggedIn = CabinetApi.instance.isLoggedIn;
+    if (_loggedIn) {
+      DfCabinetSession.to.refresh();
+    }
   }
 
   void _go(CabinetSection s) {
@@ -118,7 +123,10 @@ class _DeskForceCabinetPageState extends State<DeskForceCabinetPage> {
           Expanded(
             child: !_loggedIn
                 ? CabinetAuthScreen(
-                    onLoggedIn: () => setState(() => _loggedIn = true),
+                    onLoggedIn: () {
+                      setState(() => _loggedIn = true);
+                      DfCabinetSession.to.refresh();
+                    },
                   )
                 : Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -278,10 +286,13 @@ class _DeskForceCabinetPageState extends State<DeskForceCabinetPage> {
         return const CabinetSupportScreen();
       case CabinetSection.profile:
         return CabinetProfileScreen(
-          onLoggedOut: () => setState(() {
-            _loggedIn = false;
-            _section = CabinetSection.overview;
-          }),
+          onLoggedOut: () {
+                          setState(() {
+                            _loggedIn = false;
+                            _section = CabinetSection.overview;
+                          });
+                          DfCabinetSession.to.refresh();
+                        },
         );
     }
   }

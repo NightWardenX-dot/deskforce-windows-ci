@@ -30,6 +30,8 @@ const Map<String, String> kDfCabinetErrors = {
   'Timeout': 'Сервер не ответил вовремя. Попробуйте ещё раз.',
   'Unauthorized': 'Сессия истекла. Войдите снова.',
   'CaptchaError': 'Проверка безопасности не пройдена. Обновите форму.',
+  'DeviceLimitReached': 'Достигнут лимит устройств по тарифу.',
+  'DeviceOwnedByOther': 'Устройство уже привязано к другому аккаунту.',
   'BotGuardError': 'Проверка «я не робот» не пройдена. Подождите пару секунд и повторите.',
   'UsernameOrPasswordError': 'Неверный логин или пароль',
   'TfaCodeError': 'Неверный код 2FA',

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet/cabinet_api.dart';
+import 'package:flutter_hbb/desktop/pages/cabinet/cabinet_session.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet/cabinet_errors.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet/cabinet_theme.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet/click_sound.dart';
@@ -167,7 +168,7 @@ class _CabinetProfileScreenState extends State<CabinetProfileScreen> {
 
   Future<void> _logout() async {
     await dfPlayClickSound();
-    await CabinetApi.instance.logout();
+    await DfCabinetSession.to.logout();
     widget.onLoggedOut();
   }
 

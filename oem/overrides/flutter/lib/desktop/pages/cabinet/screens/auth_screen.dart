@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet/cabinet_api.dart';
+import 'package:flutter_hbb/desktop/pages/cabinet/cabinet_session.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet/cabinet_errors.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet/cabinet_theme.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet/click_sound.dart';
@@ -108,6 +109,7 @@ class _CabinetAuthScreenState extends State<CabinetAuthScreen> {
             setState(() => _ok = 'Открыта консоль администратора в браузере.');
             return;
           }
+          await DfCabinetSession.to.onLoggedIn();
           widget.onLoggedIn();
           break;
         case _AuthMode.register:
@@ -138,8 +140,7 @@ class _CabinetAuthScreenState extends State<CabinetAuthScreen> {
         case _AuthMode.forgot:
           final u = _user.text.trim();
           final body = <String, dynamic>{
-            ...CabinetApi.botFields(
-                formOpenedAt: opened, captchaId: _challengeId),
+            ...await api.prepareBotFields(opened),
           };
           if (u.contains('@')) {
             body['email'] = u;

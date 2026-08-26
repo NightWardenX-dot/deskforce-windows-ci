@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet/cabinet_api.dart';
+import 'package:flutter_hbb/desktop/pages/cabinet/cabinet_session.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet/cabinet_errors.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet/cabinet_theme.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet/click_sound.dart';
@@ -51,6 +52,8 @@ class _CabinetOverviewScreenState extends State<CabinetOverviewScreen> {
         _downloads = dl;
         _loading = false;
       });
+      // Keep home-page account chip in sync.
+      DfCabinetSession.to.refresh();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -175,7 +178,64 @@ class _CabinetOverviewScreenState extends State<CabinetOverviewScreen> {
               ],
             ),
           ),
+          DfCabinetTheme.panel(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Этот ПК',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                        color: DfCabinetTheme.ink)),
+                const SizedBox(height: 6),
+                Builder(builder: (_) {
+                  final s = DfCabinetSession.to;
+                  final id = s.localDeviceId.value;
+                  final linked = s.localIdLinked.value;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        id.isEmpty
+                            ? 'Идентификатор DeskForce ещё не получен'
+                            : 'ID: $id',
+                        style: TextStyle(
+                            color: DfCabinetTheme.ink.withOpacity(0.65),
+                            fontSize: 14),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        linked
+                            ? 'Привязан к вашему аккаунту кабинета'
+                            : 'Не привязан — нажмите, чтобы связать с аккаунтом',
+                        style: TextStyle(
+                            color: linked
+                                ? DfCabinetTheme.ok
+                                : DfCabinetTheme.brassDeep,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600),
+                      ),
+                      if (!linked && id.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        ElevatedButton(
+                          style: DfCabinetTheme.primaryButton(),
+                          onPressed: dfClickWrap(() async {
+                            await s.claimLocalDevice();
+                            await _load();
+                          }),
+                          child: const Text('Привязать этот ПК',
+                              style: TextStyle(fontWeight: FontWeight.w700)),
+                        ),
+                      ],
+                    ],
+                  );
+                }),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
           if (_downloads != null) ...[
+
             const SizedBox(height: 14),
             DfCabinetTheme.panel(
               child: Column(

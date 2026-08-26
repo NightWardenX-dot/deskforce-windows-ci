@@ -11,6 +11,7 @@ import 'package:flutter_hbb/common/widgets/custom_password.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/pages/connection_page.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet_webview_page.dart';
+import 'package:flutter_hbb/desktop/pages/cabinet/cabinet_session.dart';
 import 'package:flutter_hbb/common/deskforce_startup.dart';
 import 'package:flutter_hbb/common/deskforce_update.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_tab_page.dart';
@@ -93,7 +94,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                     children: [
                       _buildBrandHeader(context, ink),
                       const SizedBox(height: 14),
-                      _buildCabinetButton(context),
+                      _buildCabinetAccountPanel(context),
                       const SizedBox(height: 22),
                       if (!isOutgoingOnly) buildPresetPasswordWarning(),
                       if (!isOutgoingOnly) ...[
@@ -236,7 +237,201 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   }
 
 
-  Widget _buildCabinetButton(BuildContext context) {
+  Widget _buildCabinetAccountPanel(BuildContext context) {
+    DfCabinetSession.ensure();
+    return Obx(() {
+      final s = DfCabinetSession.to;
+      final logged = s.loggedIn.value;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildCabinetButton(context, loggedIn: logged, label: s.chipLabel),
+          if (logged) ...[
+            const SizedBox(height: 10),
+            _cabinetStatusCard(context, s),
+          ],
+        ],
+      );
+    });
+  }
+
+  Widget _cabinetStatusCard(BuildContext context, DfCabinetSession s) {
+    final ink = const Color(0xFF12161C);
+    final brass = const Color(0xFFB8892A);
+    final devicesPreview = s.devices.take(3).toList();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFBF8F1),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: const Color(0x55B8892A)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                s.licenseActive.value
+                    ? Icons.verified_outlined
+                    : Icons.warning_amber_outlined,
+                size: 18,
+                color: s.licenseActive.value
+                    ? const Color(0xFF2F6B3A)
+                    : brass,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  s.licenseLabel.isEmpty
+                      ? 'Статус лицензии загружается…'
+                      : s.licenseLabel,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: ink.withOpacity(0.85),
+                  ),
+                ),
+              ),
+              if (s.loading.value)
+                const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFB8892A)),
+                )
+              else
+                IconButton(
+                  tooltip: 'Обновить',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                  onPressed: () => s.refresh(),
+                  icon: Icon(Icons.refresh, size: 16, color: brass),
+                ),
+            ],
+          ),
+          if (s.overLimit.value) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Лимит одновременных сессий исчерпан.',
+              style: TextStyle(fontSize: 12, color: Color(0xFFB42318), fontWeight: FontWeight.w600),
+            ),
+          ],
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              _cabinetChip(
+                'Устройства ${s.onlineDevices.value}/${s.deviceCount.value}',
+                onTap: () => openDeskForceCabinet(
+                  url: 'https://deskforce.dr6ter.ru/cabinet/devices?embed=1',
+                  title: 'Устройства',
+                ),
+              ),
+              _cabinetChip(
+                s.localIdLinked.value
+                    ? 'Этот ПК привязан'
+                    : 'Привязать этот ПК',
+                onTap: () async {
+                  if (!s.localIdLinked.value) {
+                    await s.claimLocalDevice();
+                    await s.refresh();
+                  } else {
+                    openDeskForceCabinet(
+                      url: 'https://deskforce.dr6ter.ru/cabinet/devices?embed=1',
+                      title: 'Устройства',
+                    );
+                  }
+                },
+              ),
+              if (s.openTickets.value > 0)
+                _cabinetChip(
+                  'Тикеты: ${s.openTickets.value}',
+                  onTap: () => openDeskForceCabinet(
+                    url: 'https://deskforce.dr6ter.ru/cabinet/support?embed=1',
+                    title: 'Поддержка',
+                  ),
+                ),
+              _cabinetChip(
+                'Тарифы',
+                onTap: () => openDeskForceCabinet(
+                  url: 'https://deskforce.dr6ter.ru/cabinet/billing?embed=1',
+                  title: 'Тарифы',
+                ),
+              ),
+            ],
+          ),
+          if (devicesPreview.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              'С устройствами кабинета',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: ink.withOpacity(0.55),
+              ),
+            ),
+            const SizedBox(height: 6),
+            ...devicesPreview.map((d) {
+              final online = d['is_online'] == true;
+              final title = (d['hostname'] ?? d['device_id'] ?? '—').toString();
+              final id = (d['device_id'] ?? '').toString();
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.circle,
+                      size: 8,
+                      color: online
+                          ? const Color(0xFF2F6B3A)
+                          : ink.withOpacity(0.3),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        id.isEmpty ? title : '$title · $id',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12, color: ink.withOpacity(0.75)),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _cabinetChip(String label, {required VoidCallback onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(3),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: const Color(0x1AB8892A),
+          borderRadius: BorderRadius.circular(3),
+          border: Border.all(color: const Color(0x55B8892A)),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF12161C),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCabinetButton(BuildContext context,
+      {bool loggedIn = false, String label = 'Личный кабинет'}) {
     return SizedBox(
       width: double.infinity,
       child: OutlinedButton.icon(
@@ -252,10 +447,13 @@ class _DesktopHomePageState extends State<DesktopHomePage>
             title: 'Личный кабинет',
           );
         },
-        icon: const Icon(Icons.account_circle_outlined, color: Color(0xFFB8892A)),
-        label: const Text(
-          'Личный кабинет',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+        icon: Icon(
+          loggedIn ? Icons.account_circle : Icons.account_circle_outlined,
+          color: const Color(0xFFB8892A),
+        ),
+        label: Text(
+          loggedIn ? label : 'Войти в кабинет',
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
         ),
       ),
     );
@@ -814,6 +1012,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   @override
   void initState() {
     super.initState();
+    DfCabinetSession.ensure();
     _updateTimer = periodic_immediate(const Duration(seconds: 1), () async {
       await gFFI.serverModel.fetchID();
       final error = await bind.mainGetError();
