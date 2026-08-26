@@ -287,7 +287,7 @@ pub fn apply_deskforce_oem() {{
     loc.insert("theme".into(), "light".into());
     loc.insert("enable-check-update".into(), "N".into());
     // Default: expand window on launch (user can turn off in settings).
-    loc.insert("df-start-fullscreen".into(), "Y".into());
+    loc.insert("df-start-fullscreen".into(), "N".into());  # beta.17: never default-maximize
     drop(loc);
 
     let mut oloc = OVERWRITE_LOCAL_SETTINGS.write().unwrap();

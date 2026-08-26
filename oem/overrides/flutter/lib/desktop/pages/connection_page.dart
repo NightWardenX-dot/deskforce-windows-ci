@@ -1,4 +1,4 @@
-// DeskForce connect panel — plain TextField + Recent/Fav/Address book (no stock autocomplete overlay)
+// DeskForce connect panel — plain TextField + themed recent peers (no stock autocomplete overlay)
 
 import 'dart:async';
 import 'dart:convert';
@@ -15,7 +15,6 @@ import '../../common/formatter/id_formatter.dart';
 import '../../models/platform_model.dart';
 import '../../models/peer_model.dart';
 import '../../desktop/widgets/material_mod_popup_menu.dart' as mod_menu;
-import 'package:flutter_hbb/desktop/pages/deskforce_peer_lists.dart';
 
 /// DeskForce paper/brass server status — not the classic RustDesk green/red dot.
 class OnlineStatusWidget extends StatefulWidget {
@@ -29,21 +28,16 @@ class OnlineStatusWidget extends StatefulWidget {
 }
 
 class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
-  late final RxBool _svcStopped;
+  final _svcStopped = Get.find<RxBool>(tag: 'stop-service');
   Timer? _updateTimer;
 
-  static const _ink = Color(0xFFE8F4FF);
-  static const _brass = Color(0xFF2DD4BF);
-  static const _offline = Color(0xFFF87171);
+  static const _ink = Color(0xFF12161C);
+  static const _brass = Color(0xFFB8892A);
+  static const _offline = Color(0xFF8A5A3A);
 
   @override
   void initState() {
     super.initState();
-    try {
-      _svcStopped = Get.find<RxBool>(tag: 'stop-service');
-    } catch (_) {
-      _svcStopped = false.obs;
-    }
     _updateTimer = periodic_immediate(Duration(seconds: 1), () async {
       updateStatus();
     });
@@ -70,19 +64,19 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
       Color badgeFg;
       if (stopped) {
         label = 'Офлайн';
-        badgeBg = const Color(0xFF1A2332);
+        badgeBg = const Color(0xFFE8E2D4);
         badgeFg = _offline;
       } else if (connecting) {
         label = 'Подключение…';
-        badgeBg = const Color(0x332DD4BF);
+        badgeBg = const Color(0xFFF5E6C8);
         badgeFg = _brass;
       } else if (online) {
         label = 'Онлайн';
-        badgeBg = const Color(0x332DD4BF);
-        badgeFg = const Color(0xFF34D399);
+        badgeBg = const Color(0xFFE8F0E4);
+        badgeFg = const Color(0xFF3D6B3A);
       } else {
         label = 'Офлайн';
-        badgeBg = const Color(0xFF1A2332);
+        badgeBg = const Color(0xFFE8E2D4);
         badgeFg = _offline;
       }
 
@@ -94,8 +88,8 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: badgeBg,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: _brass.withOpacity(0.45)),
+                borderRadius: BorderRadius.circular(3),
+                border: Border.all(color: _brass.withOpacity(0.55)),
               ),
               child: Text(
                 label,
@@ -197,8 +191,6 @@ class _ConnectionPageState extends State<ConnectionPage>
     windowManager.addListener(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       bind.mainLoadRecentPeers();
-      bind.mainLoadLanPeers();
-      bind.mainDiscover();
     });
   }
 
@@ -275,9 +267,9 @@ class _ConnectionPageState extends State<ConnectionPage>
 
   /// UI for the remote ID TextField — DeskForce station connect panel.
   /// Plain TextField only (stock autocomplete overlay reserved a dead panel under
-  /// «Подключить устройство» on Windows). Peer lists (incl. Адресная книга) below.
+  /// «Подключить устройство» on Windows). Recent peers are in-tree below.
   Widget _buildRemoteIDTextField(BuildContext context) {
-    final ink = MyTheme.dark;
+    final ink = Theme.of(context).textTheme.titleLarge?.color ?? MyTheme.dark;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -308,7 +300,7 @@ class _ConnectionPageState extends State<ConnectionPage>
               cursorColor: MyTheme.accent,
               decoration: InputDecoration(
                 filled: true,
-                fillColor: const Color(0xFF111827),
+                fillColor: const Color(0xFFE8E2D4),
                 counterText: '',
                 hintText:
                     _idInputFocused.value ? null : 'Введите ID устройства',
@@ -320,15 +312,15 @@ class _ConnectionPageState extends State<ConnectionPage>
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: Color(0x338BA0B8)),
+                  borderRadius: BorderRadius.circular(3),
+                  borderSide: const BorderSide(color: Color(0x3312161C)),
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: Color(0x338BA0B8)),
+                  borderRadius: BorderRadius.circular(3),
+                  borderSide: const BorderSide(color: Color(0x3312161C)),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(3),
                   borderSide:
                       const BorderSide(color: MyTheme.accent, width: 1.4),
                 ),
@@ -348,10 +340,10 @@ class _ConnectionPageState extends State<ConnectionPage>
           child: ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: MyTheme.accent,
-              foregroundColor: const Color(0xFF041016),
+              foregroundColor: const Color(0xFFF3EFE6),
               elevation: 0,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(3),
               ),
             ),
             onPressed: () {
@@ -425,75 +417,43 @@ class _ConnectionPageState extends State<ConnectionPage>
           ),
         ),
         const SizedBox(height: 16),
-        _buildLocalPeers(context, ink),
-        const SizedBox(height: 12),
-        DeskForcePeerLists(
-          ink: ink,
-          onPickId: (id) {
-            setState(() {
-              _idController.id = id;
-            });
-            onConnect();
-          },
-        ),
+        _buildRecentPeers(context, ink),
       ],
     );
   }
 
-  Widget _buildLocalPeers(BuildContext context, Color ink) {
+  Widget _buildRecentPeers(BuildContext context, Color ink) {
     return ListenableBuilder(
-      listenable: gFFI.lanPeersModel,
+      listenable: gFFI.recentPeersModel,
       builder: (context, _) {
-        final peers = gFFI.lanPeersModel.peers.take(12).toList();
+        final peers = gFFI.recentPeersModel.peers.take(6).toList();
         return Container(
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
           decoration: BoxDecoration(
-            color: const Color(0xFF0C1422),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0x338BA0B8)),
+            color: const Color(0xFFE8E2D4),
+            borderRadius: BorderRadius.circular(3),
+            border: Border.all(color: const Color(0x3312161C)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                children: [
-                  const Expanded(
-                    child: Text(
-                      'ЛОКАЛЬНАЯ СЕТЬ',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.2,
-                        color: Color(0xFF2DD4BF),
-                      ),
-                    ),
-                  ),
-                  TextButton(
-                    style: TextButton.styleFrom(
-                      foregroundColor: const Color(0xFF2DD4BF),
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    onPressed: () {
-                      bind.mainLoadLanPeers();
-                      bind.mainDiscover();
-                    },
-                    child: const Text(
-                      'Обновить',
-                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-                    ),
-                  ),
-                ],
+              Text(
+                'НЕДАВНИЕ',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.2,
+                  color: const Color(0xFF8F6A1C),
+                ),
               ),
               const SizedBox(height: 8),
               if (peers.isEmpty)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   child: Text(
-                    'Ищем устройства в локальной сети… Нажмите «Обновить», если список пуст.',
+                    'Здесь появятся устройства, к которым вы уже подключались.',
                     style: TextStyle(
                       fontSize: 14,
                       height: 1.35,
@@ -521,10 +481,10 @@ class _ConnectionPageState extends State<ConnectionPage>
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Material(
-        color: const Color(0xFF111827),
-        borderRadius: BorderRadius.circular(8),
+        color: const Color(0xFFFBF8F1),
+        borderRadius: BorderRadius.circular(3),
         child: InkWell(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(3),
           onTap: () {
             setState(() {
               _idController.id = peer.id;
@@ -540,10 +500,10 @@ class _ConnectionPageState extends State<ConnectionPage>
                   height: 8,
                   decoration: BoxDecoration(
                     color: peer.online
-                        ? const Color(0xFF34D399)
-                        : const Color(0xFF8BA0B8),
+                        ? const Color(0xFF3D6B3A)
+                        : const Color(0xFF8A5A3A),
                     shape: BoxShape.circle,
-                    border: Border.all(color: const Color(0x552DD4BF)),
+                    border: Border.all(color: const Color(0x55B8892A)),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -558,7 +518,7 @@ class _ConnectionPageState extends State<ConnectionPage>
                         style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFFE8F4FF),
+                          color: MyTheme.dark,
                         ),
                       ),
                       if (subtitle.isNotEmpty)
@@ -574,7 +534,7 @@ class _ConnectionPageState extends State<ConnectionPage>
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right, size: 18, color: Color(0xFF2DD4BF)),
+                const Icon(Icons.chevron_right, size: 18, color: Color(0xFF8F6A1C)),
               ],
             ),
           ),

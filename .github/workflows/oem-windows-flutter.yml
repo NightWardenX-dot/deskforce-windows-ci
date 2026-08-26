@@ -11,7 +11,7 @@ env:
   VCPKG_COMMIT_ID: "120deac3062162151622ca4860575a33844ba10b"
   VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
   OEM_APP_NAME: DeskForce
-  OEM_APP_VERSION: "1.2.0-beta.16"
+  OEM_APP_VERSION: "1.2.0-beta.17"
   OEM_ID_SERVER: "78.29.49.98"
   OEM_RELAY_SERVER: "78.29.49.98"
   OEM_API_SERVER: "https://deskforce.dr6ter.ru"
@@ -75,8 +75,8 @@ jobs:
 
           grep -q "deskforce" rustdesk/libs/portable/src/main.rs
 
-          grep -q 'version = "1.2.0-beta.16"' rustdesk/Cargo.toml
-          grep -q 'ProductVersion = "1.2.0-beta.16"' rustdesk/libs/portable/Cargo.toml
+          grep -q 'version = "1.2.0-beta.17"' rustdesk/Cargo.toml
+          grep -q 'ProductVersion = "1.2.0-beta.17"' rustdesk/libs/portable/Cargo.toml
           grep -q 'DESKFORCE_OEM_VERSION_BEGIN' rustdesk/flutter/windows/runner/Runner.rc
           grep -q 'webview_windows' rustdesk/flutter/pubspec.yaml
           grep -q '78.29.49.98' rustdesk/libs/hbb_common/src/config.rs
