@@ -15,6 +15,7 @@ class _CabinetDevicesScreenState extends State<CabinetDevicesScreen> {
   List<Map<String, dynamic>> _items = [];
   bool _loading = true;
   String _error = '';
+  String _busyId = '';
 
   @override
   void initState() {
@@ -59,6 +60,60 @@ class _CabinetDevicesScreenState extends State<CabinetDevicesScreen> {
     }
   }
 
+  Future<void> _delete(Map<String, dynamic> d) async {
+    final deviceId = (d['device_id'] ?? '').toString();
+    if (deviceId.isEmpty) return;
+    final online = d['is_online'] == true;
+    final fromPeer = d['from_peer'] == true;
+    if (online && !fromPeer) {
+      setState(() {
+        _error = dfCabinetError('DeviceOnline');
+      });
+      return;
+    }
+    final label = (d['hostname'] ?? deviceId).toString();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Удалить устройство?'),
+        content: Text('Убрать «$label» из аккаунта?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Отмена'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Удалить'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    setState(() {
+      _busyId = deviceId;
+      _error = '';
+    });
+    try {
+      await CabinetApi.instance.post('/devices/delete', body: {
+        'device_id': deviceId,
+        'id': d['id'] is num ? (d['id'] as num).toInt() : 0,
+      });
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = dfCabinetError(e);
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _busyId = '';
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -70,7 +125,8 @@ class _CabinetDevicesScreenState extends State<CabinetDevicesScreen> {
             children: [
               Expanded(
                 child: DfCabinetTheme.heading('Устройства',
-                    subtitle: 'Привязанные клиенты и онлайн-статус.'),
+                    subtitle:
+                        'Привязанные клиенты. Офлайн-устройства можно удалить.'),
               ),
               IconButton(
                 tooltip: 'Обновить',
@@ -86,7 +142,7 @@ class _CabinetDevicesScreenState extends State<CabinetDevicesScreen> {
               ? const Center(
                   child:
                       CircularProgressIndicator(color: DfCabinetTheme.brass))
-              : _error.isNotEmpty
+              : _error.isNotEmpty && _items.isEmpty
                   ? Center(
                       child: Text(_error,
                           style:
@@ -103,12 +159,24 @@ class _CabinetDevicesScreenState extends State<CabinetDevicesScreen> {
                           child: ListView.separated(
                             padding:
                                 const EdgeInsets.fromLTRB(28, 0, 28, 32),
-                            itemCount: _items.length,
+                            itemCount: _items.length + (_error.isNotEmpty ? 1 : 0),
                             separatorBuilder: (_, __) =>
                                 const SizedBox(height: 10),
                             itemBuilder: (context, i) {
-                              final d = _items[i];
+                              if (_error.isNotEmpty && i == 0) {
+                                return Text(_error,
+                                    style: const TextStyle(
+                                        color: DfCabinetTheme.danger,
+                                        fontSize: 13));
+                              }
+                              final idx = _error.isNotEmpty ? i - 1 : i;
+                              final d = _items[idx];
                               final online = d['is_online'] == true;
+                              final fromPeer = d['from_peer'] == true;
+                              final deviceId =
+                                  (d['device_id'] ?? '').toString();
+                              final canDelete = !(online && !fromPeer);
+                              final busy = _busyId == deviceId;
                               return DfCabinetTheme.panel(
                                 child: Row(
                                   children: [
@@ -169,6 +237,30 @@ class _CabinetDevicesScreenState extends State<CabinetDevicesScreen> {
                                               ? DfCabinetTheme.ok
                                               : DfCabinetTheme.ink
                                                   .withOpacity(0.45)),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    IconButton(
+                                      tooltip: canDelete
+                                          ? 'Удалить'
+                                          : 'Сначала отключите устройство',
+                                      onPressed: (!canDelete || busy)
+                                          ? null
+                                          : dfClickWrap(() => _delete(d)),
+                                      icon: busy
+                                          ? const SizedBox(
+                                              width: 18,
+                                              height: 18,
+                                              child:
+                                                  CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                      color: DfCabinetTheme
+                                                          .brass),
+                                            )
+                                          : Icon(Icons.delete_outline,
+                                              color: canDelete
+                                                  ? DfCabinetTheme.danger
+                                                  : DfCabinetTheme.ink
+                                                      .withOpacity(0.25)),
                                     ),
                                   ],
                                 ),
