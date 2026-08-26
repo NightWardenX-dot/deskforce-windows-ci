@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet/cabinet_api.dart';
-import 'package:flutter_hbb/models/model.dart';
+import 'package:flutter_hbb/common.dart';
 import 'package:get/get.dart';
 
 /// Shared cabinet session — surfaces license, devices, tickets on the main UI.
