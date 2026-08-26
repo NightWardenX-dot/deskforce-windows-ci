@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -12,10 +13,15 @@ const kDfAutostart = 'df-autostart';
 const kDfStartInTray = 'df-start-in-tray';
 const kDfStartFullscreen = 'df-start-fullscreen';
 
+/// Serialize window ops — beta.14 crashed when main.dart + home page
+/// called maximize/setSize concurrently (3 overlapping runs).
+Future<void>? _dfStartupWindowInFlight;
+bool _dfStartupWindowDone = false;
+
 bool dfLocalBool(String key) =>
     bind.mainGetLocalOption(key: key) == 'Y';
 
-/// True when option is Y, or unset (DeskForce default ON for fullscreen).
+/// True when option is Y, or unset (DeskForce default ON for maximized start).
 bool dfLocalBoolDefaultOn(String key) {
   final v = bind.mainGetLocalOption(key: key);
   if (v.isEmpty) return true;
@@ -80,20 +86,12 @@ Future<bool> dfIsWindowsAutostartEnabled() async {
   }
 }
 
-
-/// Primary-monitor work area (excludes taskbar). Falls back to a safe laptop size.
+/// Primary-monitor work area. Avoid getWindowInfo before HWND is stable.
 Future<Size> _workAreaSize() async {
   try {
     final screens = await window_size.getScreenList();
     if (screens.isNotEmpty) {
-      // Prefer the screen that currently hosts the window; else first.
-      window_size.Screen screen = screens.first;
-      try {
-        final info = await window_size.getWindowInfo();
-        final host = info.screen;
-        if (host != null) screen = host;
-      } catch (_) {}
-      final vf = screen.visibleFrame;
+      final vf = screens.first.visibleFrame;
       if (vf.width >= 320 && vf.height >= 240) {
         return Size(vf.width, vf.height);
       }
@@ -105,8 +103,7 @@ Future<Size> _workAreaSize() async {
 }
 
 Future<void> _applySafeMinSize(Size work) async {
-  // Never force a min size larger than the work area — that clips the window
-  // on 1366x768 / high-DPI laptops (beta.13 symptom).
+  // Never force a min size larger than the work area (beta.13 clip).
   final minW = math.min(480.0, math.max(320.0, work.width * 0.45));
   final minH = math.min(360.0, math.max(240.0, work.height * 0.45));
   try {
@@ -114,22 +111,18 @@ Future<void> _applySafeMinSize(Size work) async {
   } catch (_) {}
 }
 
-Future<bool> _tryMaximize() async {
+Future<bool> _tryMaximizeOnce() async {
   try {
-    if (await windowManager.isFullScreen()) {
-      await windowManager.setFullScreen(false);
-      await Future.delayed(const Duration(milliseconds: 30));
-    }
-  } catch (_) {}
-  try {
-    if (!(await windowManager.isMaximized())) {
-      await windowManager.maximize();
-      await Future.delayed(const Duration(milliseconds: 40));
-    }
-    final ok = await windowManager.isMaximized();
-    if (ok) {
+    // Never call setFullScreen during startup — exclusive FS + maximize races
+    // crash window_manager / desktop_multi_window on some DPI setups (beta.14).
+    if (await windowManager.isMaximized()) {
       stateGlobal.setMaximized(true);
+      return true;
     }
+    await windowManager.maximize();
+    await Future.delayed(const Duration(milliseconds: 80));
+    final ok = await windowManager.isMaximized();
+    if (ok) stateGlobal.setMaximized(true);
     return ok;
   } catch (e) {
     debugPrint('maximize failed: $e');
@@ -137,10 +130,9 @@ Future<bool> _tryMaximize() async {
   }
 }
 
-/// Fit ~95% of work area, centered — used when maximize is unavailable.
 Future<void> _fitWorkArea(Size work) async {
-  final w = math.max(480.0, work.width * 0.95);
-  final h = math.max(360.0, work.height * 0.95);
+  final w = math.max(480.0, math.min(work.width * 0.92, work.width - 16));
+  final h = math.max(360.0, math.min(work.height * 0.92, work.height - 16));
   try {
     await windowManager.setSize(Size(w, h));
     await windowManager.setAlignment(Alignment.center);
@@ -149,45 +141,59 @@ Future<void> _fitWorkArea(Size work) async {
   }
 }
 
-/// Apply tray / maximized / size after the main window is ready.
-///
-/// Windows drops maximize when requested before show. Show first, then
-/// maximize with post-frame retries. Fixed 960x860 defaults were larger than
-/// many laptop work areas and left the window clipped off-screen.
-Future<void> dfApplyStartupWindowBehavior() async {
+Future<void> _applyStartupWindowBehaviorImpl({required bool force}) async {
   try {
     final work = await _workAreaSize();
     await _applySafeMinSize(work);
 
     if (dfLocalBool(kDfStartInTray)) {
       await windowManager.hide();
+      _dfStartupWindowDone = true;
       return;
     }
 
-    // Show first — maximize-before-show is unreliable on Windows.
-    await windowManager.show();
-    await windowManager.focus();
+    try {
+      await windowManager.show();
+      await windowManager.focus();
+    } catch (_) {}
 
-    // Default ON: expand to work-area (maximize). Exclusive fullscreen
-    // remains available via «Полный экран сейчас» in settings.
     if (dfLocalBoolDefaultOn(kDfStartFullscreen)) {
-      for (final delayMs in <int>[0, 80, 200, 450, 900]) {
-        if (delayMs > 0) {
-          await Future.delayed(Duration(milliseconds: delayMs));
-        }
-        if (await _tryMaximize()) {
-          return;
-        }
+      if (await _tryMaximizeOnce()) {
+        _dfStartupWindowDone = true;
+        return;
       }
-      // Do NOT fall back to exclusive fullscreen — that feels broken and
-      // still fails when the initial size exceeded the work area. Fit instead.
+      await Future.delayed(const Duration(milliseconds: 120));
+      if (await _tryMaximizeOnce()) {
+        _dfStartupWindowDone = true;
+        return;
+      }
       await _fitWorkArea(work);
+      _dfStartupWindowDone = true;
       return;
     }
 
     await _fitWorkArea(work);
+    _dfStartupWindowDone = true;
   } catch (e) {
     debugPrint('startup window behavior: $e');
+  }
+}
+
+/// Concurrent callers share one in-flight Future (beta.14 native crash fix).
+Future<void> dfApplyStartupWindowBehavior({bool force = false}) async {
+  if (!force && _dfStartupWindowDone) return;
+  if (_dfStartupWindowInFlight != null) {
+    await _dfStartupWindowInFlight;
+    if (!force && _dfStartupWindowDone) return;
+  }
+  final run = _applyStartupWindowBehaviorImpl(force: force);
+  _dfStartupWindowInFlight = run;
+  try {
+    await run;
+  } finally {
+    if (identical(_dfStartupWindowInFlight, run)) {
+      _dfStartupWindowInFlight = null;
+    }
   }
 }
 
@@ -199,15 +205,19 @@ Future<void> dfToggleFullscreen() async {
     }
     if (await windowManager.isMaximized()) {
       await windowManager.unmaximize();
+      stateGlobal.setMaximized(false);
       return;
     }
     await windowManager.maximize();
+    stateGlobal.setMaximized(true);
   } catch (_) {
     try {
       if (await windowManager.isMaximized()) {
         await windowManager.unmaximize();
+        stateGlobal.setMaximized(false);
       } else {
         await windowManager.maximize();
+        stateGlobal.setMaximized(true);
       }
     } catch (_) {}
   }

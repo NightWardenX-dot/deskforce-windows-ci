@@ -58,7 +58,8 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
   @override
   Widget build(BuildContext context) {
     return Obx(() {
-      widget.onSvcStatusChanged?.call();
+      // Do not invoke parent callbacks inside Obx build — that retriggered
+      // window resize during startup and raced with maximize (beta.14).
       final stopped = _svcStopped.value;
       final st = stateGlobal.svcStatus.value;
       final online = !stopped && st == SvcStatus.ready;

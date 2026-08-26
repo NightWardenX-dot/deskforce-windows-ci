@@ -1247,14 +1247,14 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     }
   }
 
-  /// DeskForce: larger centered window + startup tray/fullscreen options.
+  /// DeskForce: one serialized startup pass (main.dart may already run it).
+  /// A single delayed force-retry covers Windows restoring pre-maximize size
+  /// after the first Flutter frame — never overlap concurrent window APIs.
   Future<void> _ensureDeskForceWindowSize() async {
     await dfApplyStartupWindowBehavior();
-    // Second pass after first layout — Windows sometimes restores the
-    // pre-maximize size once Flutter paints the first frame.
-    await Future.delayed(const Duration(milliseconds: 200));
+    await Future.delayed(const Duration(milliseconds: 350));
     if (!mounted) return;
-    await dfApplyStartupWindowBehavior();
+    await dfApplyStartupWindowBehavior(force: true);
   }
 
   @override
