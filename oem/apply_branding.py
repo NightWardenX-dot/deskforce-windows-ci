@@ -777,7 +777,7 @@ def patch_home_cabinet_links(src: pathlib.Path, api: str) -> None:
     text = text.replace("https://example.com", base)
     text = re.sub(
         r"const borderColor = Color\(0x[0-9A-Fa-f]+\);",
-        "const borderColor = Color(0xFFB8892A);",
+        "const borderColor = Color(0xFF2DD4BF);",
         text,
         count=1,
     )
@@ -792,10 +792,10 @@ def patch_titlebar(src: pathlib.Path) -> None:
     path.write_text(
         """import 'package:flutter/material.dart';
 
-// DeskForce paper/brass title bar
-const sidebarColor = Color(0xFFE8E2D4);
-const backgroundStartColor = Color(0xFFF3EFE6);
-const backgroundEndColor = Color(0xFFE8E2D4);
+// DeskForce slate/teal title bar (site tokens)
+const sidebarColor = Color(0xFF0C1422);
+const backgroundStartColor = Color(0xFF070B14);
+const backgroundEndColor = Color(0xFF0C1422);
 
 class DesktopTitleBar extends StatelessWidget {
   final Widget? child;
@@ -825,7 +825,7 @@ class DesktopTitleBar extends StatelessWidget {
 """,
         encoding="utf-8",
     )
-    print("Patched: titlebar_widget paper/brass")
+    print("Patched: titlebar_widget slate/teal")
 
 
 def patch_theme_force_light(src: pathlib.Path) -> None:
@@ -837,10 +837,14 @@ def patch_theme_force_light(src: pathlib.Path) -> None:
     return themeModeFromString(bind.mainGetLocalOption(key: kCommConfKeyTheme));
   }"""
     new = """  static ThemeMode getThemeModePreference() {
-    // DeskForce: product UI is paper/brass light
+    // DeskForce: site slate/teal chrome (MyTheme paints dark paper)
     return ThemeMode.light;
   }"""
-    if "DeskForce: product UI is paper/brass light" in text:
+    if "DeskForce: site slate/teal chrome" in text or "DeskForce: product UI is paper/brass light" in text:
+        if "DeskForce: site slate/teal chrome" not in text and old in text:
+            path.write_text(text.replace(old, new, 1), encoding="utf-8")
+            print("Patched: force ThemeMode.light (slate/teal)")
+            return
         print("OK already: force light theme")
         return
     if old in text:
@@ -851,7 +855,7 @@ def patch_theme_force_light(src: pathlib.Path) -> None:
 
 
 def patch_mytheme_paper_brass(src: pathlib.Path) -> None:
-    """Replace stock RustDesk blue MyTheme + ColorThemeExtension with paper/brass.
+    """Replace stock RustDesk blue MyTheme + ColorThemeExtension with slate/teal.
 
     Anchored to `class MyTheme` / ColorThemeExtension.light so re-runs cannot
     corrupt ColorThemeExtension (older regex spanned DeskForce comments).
@@ -862,17 +866,17 @@ def patch_mytheme_paper_brass(src: pathlib.Path) -> None:
     text = path.read_text(encoding="utf-8", errors="ignore")
 
     ext_light = """  static final light = ColorThemeExtension(
-    border: Color(0x3812161C),
-    border2: Color(0xFF8F6A1C),
-    border3: Color(0x1F12161C),
-    highlight: Color(0xFFE8E2D4),
-    drag_indicator: Color(0xFF4A5563),
-    shadow: Color(0xFF12161C),
-    errorBannerBg: Color(0xFFFDEEEB),
-    me: Color(0xFF2F6B4F),
-    toastBg: Color(0xCC12161C),
-    toastText: Color(0xFFF3EFE6),
-    divider: Color(0x3812161C),
+    border: Color(0x338BA0B8),
+    border2: Color(0xFF2DD4BF),
+    border3: Color(0x228BA0B8),
+    highlight: Color(0xFF0C1422),
+    drag_indicator: Color(0xFF8BA0B8),
+    shadow: Color(0xFF000000),
+    errorBannerBg: Color(0xFF3F1D2E),
+    me: Color(0xFF34D399),
+    toastBg: Color(0xCC070B14),
+    toastText: Color(0xFFE8F4FF),
+    divider: Color(0x338BA0B8),
   );"""
     text2, n_ext = re.subn(
         r"  static final light = ColorThemeExtension\([\s\S]*?\n  \);",
@@ -881,23 +885,23 @@ def patch_mytheme_paper_brass(src: pathlib.Path) -> None:
         count=1,
     )
     if n_ext:
-        print("Patched: ColorThemeExtension.light paper/brass")
+        print("Patched: ColorThemeExtension.light slate/teal")
     else:
         print("WARN: ColorThemeExtension.light not patched", file=sys.stderr)
 
-    colors = """  // DeskForce paper/brass/ink (site.css)
-  static const Color grayBg = Color(0xFFE8E2D4);
-  static const Color accent = Color(0xFFB8892A);
-  static const Color accent50 = Color(0x77B8892A);
-  static const Color accent80 = Color(0xAAB8892A);
-  static const Color canvasColor = Color(0xFFF3EFE6);
-  static const Color border = Color(0x1F12161C);
-  static const Color idColor = Color(0xFF8F6A1C);
-  static const Color darkGray = Color(0xFF4A5563);
-  static const Color cmIdColor = Color(0xFF2F6B4F);
-  static const Color dark = Color(0xFF12161C);
-  static const Color button = Color(0xFFB8892A);
-  static const Color hoverBorder = Color(0xFF8F6A1C);"""
+    colors = """  // DeskForce slate/teal/ink (site/tokens.css)
+  static const Color grayBg = Color(0xFF0C1422);
+  static const Color accent = Color(0xFF2DD4BF);
+  static const Color accent50 = Color(0x772DD4BF);
+  static const Color accent80 = Color(0xAA2DD4BF);
+  static const Color canvasColor = Color(0xFF070B14);
+  static const Color border = Color(0x338BA0B8);
+  static const Color idColor = Color(0xFF5EEAD4);
+  static const Color darkGray = Color(0xFF8BA0B8);
+  static const Color cmIdColor = Color(0xFF34D399);
+  static const Color dark = Color(0xFFE8F4FF);
+  static const Color button = Color(0xFF2DD4BF);
+  static const Color hoverBorder = Color(0xFF2DD4BF);"""
 
     m = re.search(r"class MyTheme \{", text2)
     if not m:
@@ -939,7 +943,7 @@ def patch_mytheme_paper_brass(src: pathlib.Path) -> None:
         count=1,
     )
     if n_colors:
-        print("Patched: MyTheme color constants paper/brass")
+        print("Patched: MyTheme color constants slate/teal")
     else:
         print("WARN: MyTheme color constants not patched", file=sys.stderr)
 
@@ -950,49 +954,49 @@ def patch_mytheme_paper_brass(src: pathlib.Path) -> None:
     light_reps = [
         (
             "scaffoldBackgroundColor: Colors.white,",
-            "scaffoldBackgroundColor: Color(0xFFF3EFE6),",
+            "scaffoldBackgroundColor: Color(0xFF070B14),",
         ),
         (
             "dialogBackgroundColor: Colors.white,",
-            "dialogBackgroundColor: Color(0xFFF3EFE6),",
+            "dialogBackgroundColor: Color(0xFF0C1422),",
         ),
         (
             "hoverColor: Color.fromARGB(255, 224, 224, 224),",
-            "hoverColor: Color(0xFFE8E2D4),",
+            "hoverColor: Color(0xFF111827),",
         ),
         (
             "hintColor: Color(0xFFAAAAAA),",
-            "hintColor: Color(0xFF4A5563),",
+            "hintColor: Color(0xFF8BA0B8),",
         ),
         (
             "MenuStyle(backgroundColor: MaterialStatePropertyAll(Colors.white))),",
-            "MenuStyle(backgroundColor: MaterialStatePropertyAll(Color(0xFFF3EFE6)))),",
+            "MenuStyle(backgroundColor: MaterialStatePropertyAll(Color(0xFF0C1422)))),",
         ),
         (
             "colorScheme: ColorScheme.light(\n        primary: Colors.blue, secondary: accent, background: grayBg),",
-            "colorScheme: ColorScheme.light(\n        primary: accent, secondary: accent, background: Color(0xFFE8E2D4), onPrimary: Color(0xFFF3EFE6)),",
+            "colorScheme: ColorScheme.light(\n        primary: accent, secondary: accent, background: Color(0xFF0C1422), onPrimary: Color(0xFF041016), onBackground: Color(0xFFE8F4FF), onSurface: Color(0xFFE8F4FF)),",
         ),
         (
             "popupMenuTheme: PopupMenuThemeData(\n        color: Colors.white,",
-            "popupMenuTheme: PopupMenuThemeData(\n        color: Color(0xFFF3EFE6),",
+            "popupMenuTheme: PopupMenuThemeData(\n        color: Color(0xFF0C1422),",
         ),
         # Idempotent / prior DeskForce dark-as-light leftovers:
         (
             "brightness: Brightness.dark,\n    hoverColor: Color.fromARGB(255, 40, 40, 40),\n    scaffoldBackgroundColor: Color(0xFF121212),\n    dialogBackgroundColor: Color(0xFF141414),",
-            "brightness: Brightness.light,\n    hoverColor: Color(0xFFE8E2D4),\n    scaffoldBackgroundColor: Color(0xFFF3EFE6),\n    dialogBackgroundColor: Color(0xFFF3EFE6),",
+            "brightness: Brightness.light,\n    hoverColor: Color(0xFF111827),\n    scaffoldBackgroundColor: Color(0xFF070B14),\n    dialogBackgroundColor: Color(0xFF0C1422),",
         ),
         (
             "cardColor: Color(0xFF1C1C1C),\n    hintColor: Color(0xFF9A9A9A),",
-            "cardColor: Color(0xFFE8E2D4),\n    hintColor: Color(0xFF4A5563),",
+            "cardColor: Color(0xFF0C1422),\n    hintColor: Color(0xFF8BA0B8),",
         ),
-        ("labelColor: Color(0xFFF5C518),", "labelColor: Color(0xFFB8892A),"),
+        ("labelColor: Color(0xFFF5C518),", "labelColor: Color(0xFF2DD4BF),"),
         (
             "colorScheme: ColorScheme.dark(\n        primary: accent, secondary: accent, background: Color(0xFF1C1C1C)),",
-            "colorScheme: ColorScheme.light(\n        primary: accent, secondary: accent, background: Color(0xFFE8E2D4), onPrimary: Color(0xFFF3EFE6)),",
+            "colorScheme: ColorScheme.light(\n        primary: accent, secondary: accent, background: Color(0xFF0C1422), onPrimary: Color(0xFF041016), onBackground: Color(0xFFE8F4FF), onSurface: Color(0xFFE8F4FF)),",
         ),
         (
             "MenuStyle(backgroundColor: MaterialStatePropertyAll(Color(0xFF121212)))),",
-            "MenuStyle(backgroundColor: MaterialStatePropertyAll(Color(0xFFF3EFE6)))),",
+            "MenuStyle(backgroundColor: MaterialStatePropertyAll(Color(0xFF0C1422)))),",
         ),
     ]
     for old, new in light_reps:
@@ -1002,11 +1006,11 @@ def patch_mytheme_paper_brass(src: pathlib.Path) -> None:
 
     # Kill leftover stock RustDesk blue literals anywhere in common.dart.
     for old, new in (
-        ("Color(0xFF0071FF)", "Color(0xFFB8892A)"),
-        ("Color(0x770071FF)", "Color(0x77B8892A)"),
-        ("Color(0xAA0071FF)", "Color(0xAAB8892A)"),
-        ("Color(0xFF2C8CFF)", "Color(0xFFB8892A)"),
-        ("Color(0xFF00B6F0)", "Color(0xFF8F6A1C)"),
+        ("Color(0xFF0071FF)", "Color(0xFF2DD4BF)"),
+        ("Color(0x770071FF)", "Color(0x772DD4BF)"),
+        ("Color(0xAA0071FF)", "Color(0xAA2DD4BF)"),
+        ("Color(0xFF2C8CFF)", "Color(0xFF2DD4BF)"),
+        ("Color(0xFF00B6F0)", "Color(0xFF2DD4BF)"),
         ("primary: Colors.blue,", "primary: accent,"),
     ):
         if old in text2:
@@ -1014,7 +1018,21 @@ def patch_mytheme_paper_brass(src: pathlib.Path) -> None:
             print(f"Patched leftover {old} -> brass")
 
     path.write_text(text2, encoding="utf-8")
-    print("Patched: MyTheme paper/brass colors")
+    
+    # Ensure body/title text is light ink on dark paper canvas
+    text2 = text2.replace(
+        "color: MyTheme.dark)",
+        "color: Color(0xFFE8F4FF))",
+    )
+    # Avoid double-replacing accent usages incorrectly — only in textTheme blocks is hard;
+    # MyTheme.dark const itself is already Color(0xFFE8F4FF), so Theme text using MyTheme.dark is fine.
+    # Force ColorScheme surface/onSurface if still stock:
+    text2 = text2.replace(
+        "background: grayBg)",
+        "background: Color(0xFF0C1422), onPrimary: Color(0xFF041016), onBackground: Color(0xFFE8F4FF), onSurface: Color(0xFFE8F4FF))",
+    )
+
+    print("Patched: MyTheme slate/teal colors")
 
 
 def write_overlay_toml(
@@ -1052,16 +1070,16 @@ def patch_tabbar(src: pathlib.Path) -> None:
       selectedTabBackgroundColor: Colors.white54);"""
     new = """  static const light = TabbarTheme(
       selectedTabIconColor: MyTheme.accent,
-      unSelectedTabIconColor: Color(0xFF4A5563),
-      selectedTextColor: Color(0xFF12161C),
-      unSelectedTextColor: Color(0xFF4A5563),
-      selectedIconColor: Color(0xFF12161C),
-      unSelectedIconColor: Color(0xFF4A5563),
-      dividerColor: Color(0x3812161C),
-      hoverColor: Color(0x66E8E2D4),
-      closeHoverColor: Color(0xFFF3EFE6),
-      selectedTabBackgroundColor: Color(0x66E8E2D4));"""
-    if "0xFF4A5563" in text and "selectedTabBackgroundColor: Color(0x66E8E2D4)" in text:
+      unSelectedTabIconColor: Color(0xFF8BA0B8),
+      selectedTextColor: Color(0xFFE8F4FF),
+      unSelectedTextColor: Color(0xFF8BA0B8),
+      selectedIconColor: Color(0xFF041016),
+      unSelectedIconColor: Color(0xFF8BA0B8),
+      dividerColor: Color(0x338BA0B8),
+      hoverColor: Color(0x332DD4BF),
+      closeHoverColor: Color(0xFF0C1422),
+      selectedTabBackgroundColor: Color(0x332DD4BF));"""
+    if "0xFF4A5563" in text and "selectedTabBackgroundColor: Color(0x332DD4BF)" in text:
         print("OK already: tabbar light brass")
         return
     if old in text:

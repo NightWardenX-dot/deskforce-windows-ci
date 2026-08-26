@@ -36,7 +36,7 @@ class DesktopHomePage extends StatefulWidget {
   State<DesktopHomePage> createState() => _DesktopHomePageState();
 }
 
-const borderColor = Color(0xFFB8892A);
+const borderColor = Color(0xFF2DD4BF);
 
 class _DesktopHomePageState extends State<DesktopHomePage>
     with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
@@ -64,7 +64,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     super.build(context);
     final isIncomingOnly = bind.isIncomingOnly();
     final isOutgoingOnly = bind.isOutgoingOnly();
-    final ink = Theme.of(context).textTheme.titleLarge?.color ?? MyTheme.dark;
+    final ink = MyTheme.dark;
     return _buildBlock(
       child: Container(
         color: MyTheme.canvasColor,
@@ -82,62 +82,105 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                 child: dfUpdateBannerHost(context),
               ),
             ),
-            Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 760),
-                child: SingleChildScrollView(
-                  controller: _leftPaneScrollController,
-                  padding: const EdgeInsets.fromLTRB(28, 18, 28, 28),
-                  child: Column(
-                    key: _childKey,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _buildBrandHeader(context, ink),
-                      const SizedBox(height: 14),
-                      _buildCabinetAccountPanel(context),
-                      const SizedBox(height: 22),
-                      if (!isOutgoingOnly) buildPresetPasswordWarning(),
-                      if (!isOutgoingOnly) ...[
-                        _sectionLabel('Этот ПК'),
-                        const SizedBox(height: 10),
-                        _stationCard(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              buildIDBoard(context),
-                              const SizedBox(height: 8),
-                              buildPasswordBoard(context),
-                            ],
-                          ),
+            Positioned.fill(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final wide = constraints.maxWidth >= 980;
+                  final left = <Widget>[
+                    _buildBrandHeader(context, ink),
+                    const SizedBox(height: 14),
+                    _buildCabinetAccountPanel(context),
+                    const SizedBox(height: 22),
+                    if (!isOutgoingOnly) buildPresetPasswordWarning(),
+                    if (!isOutgoingOnly) ...[
+                      _sectionLabel('Этот ПК'),
+                      const SizedBox(height: 10),
+                      _stationCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            buildIDBoard(context),
+                            const SizedBox(height: 8),
+                            buildPasswordBoard(context),
+                          ],
                         ),
-                        const SizedBox(height: 22),
-                      ],
-                      if (!isIncomingOnly) ...[
-                        _sectionLabel('Подключение'),
-                        const SizedBox(height: 10),
-                        _stationCard(child: const ConnectionPage()),
-                        const SizedBox(height: 18),
-                      ],
-                      _buildFooterLinks(context),
-                      const SizedBox(height: 12),
-                      // DeskForce: status badge only — never stock RustDesk help/install cards
-                      // (those were the tall gray/pink box under «Подключить устройство»
-                      // when the Windows service is stopped / not installed).
-                      if (!isOutgoingOnly)
-                        OnlineStatusWidget(
-                          onSvcStatusChanged: () {
-                            if (isIncomingOnly && isInHomePage()) {
-                              Future.delayed(const Duration(milliseconds: 300),
-                                  () {
-                                _updateWindowSize();
-                              });
-                            }
-                          },
-                        ),
-                      buildPluginEntry(),
+                      ),
+                      const SizedBox(height: 18),
+                      OnlineStatusWidget(
+                        onSvcStatusChanged: () {
+                          if (isIncomingOnly && isInHomePage()) {
+                            Future.delayed(const Duration(milliseconds: 300),
+                                () {
+                              _updateWindowSize();
+                            });
+                          }
+                        },
+                      ),
                     ],
-                  ),
-                ),
+                    const SizedBox(height: 16),
+                    _buildFooterLinks(context),
+                    buildPluginEntry(),
+                  ];
+                  final right = <Widget>[
+                    if (!isIncomingOnly) ...[
+                      _sectionLabel('Подключение'),
+                      const SizedBox(height: 10),
+                      _stationCard(child: const ConnectionPage()),
+                    ],
+                  ];
+                  final pad = EdgeInsets.fromLTRB(
+                    wide ? 28 : 18,
+                    18,
+                    wide ? 28 : 18,
+                    28,
+                  );
+                  if (wide) {
+                    return Padding(
+                      padding: pad,
+                      child: Row(
+                        key: _childKey,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            flex: 5,
+                            child: SingleChildScrollView(
+                              controller: _leftPaneScrollController,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: left,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 22),
+                          Expanded(
+                            flex: 6,
+                            child: SingleChildScrollView(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: right,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  return SingleChildScrollView(
+                    controller: _leftPaneScrollController,
+                    padding: pad,
+                    child: Column(
+                      key: _childKey,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        ...left,
+                        if (!isIncomingOnly) ...[
+                          const SizedBox(height: 22),
+                          ...right,
+                        ],
+                      ],
+                    ),
+                  );
+                },
               ),
             ),
             Positioned(
@@ -150,10 +193,10 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
                         color: _editHover.value
-                            ? const Color(0x66E8E2D4)
-                            : const Color(0xFFFBF8F1),
-                        borderRadius: BorderRadius.circular(3),
-                        border: Border.all(color: const Color(0x55B8892A)),
+                            ? const Color(0x332DD4BF)
+                            : const Color(0xD60C1422),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0x552DD4BF)),
                       ),
                       child: Text(
                         'Настройки',
@@ -175,29 +218,35 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   }
 
   Widget _buildBrandHeader(BuildContext context, Color ink) {
-    return Column(
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        loadIcon(56),
-        const SizedBox(height: 12),
-        Text(
-          'DeskForce',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 34,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.6,
-            color: ink,
-            height: 1.1,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Удалённый доступ',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 15,
-            color: ink.withOpacity(0.55),
-            letterSpacing: 0.4,
+        loadIcon(48),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'DeskForce',
+                style: TextStyle(
+                  fontSize: 30,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.6,
+                  color: ink,
+                  height: 1.1,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Удалённый доступ',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: ink.withOpacity(0.55),
+                  letterSpacing: 0.4,
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -211,7 +260,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
         fontSize: 13,
         fontWeight: FontWeight.w700,
         letterSpacing: 1.5,
-        color: Color(0xFF8F6A1C),
+        color: Color(0xFF2DD4BF),
       ),
     );
   }
@@ -221,12 +270,12 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: const Color(0xFFFBF8F1),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: const Color(0x3312161C)),
+        color: const Color(0xD60C1422),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0x338BA0B8)),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x1412161C),
+            color: Color(0x66000000),
             blurRadius: 18,
             offset: Offset(0, 8),
           ),
@@ -256,16 +305,16 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   }
 
   Widget _cabinetStatusCard(BuildContext context, DfCabinetSession s) {
-    final ink = const Color(0xFF12161C);
-    final brass = const Color(0xFFB8892A);
+    final ink = const Color(0xFFE8F4FF);
+    final brass = const Color(0xFF2DD4BF);
     final devicesPreview = s.devices.take(3).toList();
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFBF8F1),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: const Color(0x55B8892A)),
+        color: const Color(0xD60C1422),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0x552DD4BF)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -298,7 +347,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                 const SizedBox(
                   width: 14,
                   height: 14,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFB8892A)),
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF2DD4BF)),
                 )
               else
                 IconButton(
@@ -314,7 +363,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
             const SizedBox(height: 6),
             Text(
               'Лимит одновременных сессий исчерпан.',
-              style: TextStyle(fontSize: 12, color: Color(0xFFB42318), fontWeight: FontWeight.w600),
+              style: TextStyle(fontSize: 12, color: Color(0xFFF87171), fontWeight: FontWeight.w600),
             ),
           ],
           const SizedBox(height: 8),
@@ -410,20 +459,20 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   Widget _cabinetChip(String label, {required VoidCallback onTap}) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(3),
+      borderRadius: BorderRadius.circular(10),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: const Color(0x1AB8892A),
-          borderRadius: BorderRadius.circular(3),
-          border: Border.all(color: const Color(0x55B8892A)),
+          color: const Color(0x1A2DD4BF),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0x552DD4BF)),
         ),
         child: Text(
           label,
           style: const TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w700,
-            color: Color(0xFF12161C),
+            color: Color(0xFFE8F4FF),
           ),
         ),
       ),
@@ -436,10 +485,10 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       width: double.infinity,
       child: OutlinedButton.icon(
         style: OutlinedButton.styleFrom(
-          foregroundColor: const Color(0xFF12161C),
-          side: const BorderSide(color: Color(0xFFB8892A), width: 1.4),
+          foregroundColor: const Color(0xFFE8F4FF),
+          side: const BorderSide(color: Color(0xFF2DD4BF), width: 1.4),
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
-          backgroundColor: const Color(0xFFFBF8F1),
+          backgroundColor: const Color(0xD60C1422),
         ),
         onPressed: () {
           openDeskForceCabinet(
@@ -449,7 +498,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
         },
         icon: Icon(
           loggedIn ? Icons.account_circle : Icons.account_circle_outlined,
-          color: const Color(0xFFB8892A),
+          color: const Color(0xFF2DD4BF),
         ),
         label: Text(
           loggedIn ? label : 'Войти в кабинет',
@@ -542,9 +591,9 @@ class _DesktopHomePageState extends State<DesktopHomePage>
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
-              color: const Color(0xFFE8E2D4),
-              borderRadius: BorderRadius.circular(3),
-              border: Border.all(color: const Color(0x3312161C)),
+              color: const Color(0xFF0C1422),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0x338BA0B8)),
             ),
             child: TextFormField(
               controller: model.serverId,
@@ -576,9 +625,9 @@ class _DesktopHomePageState extends State<DesktopHomePage>
         () => Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
-            color: hover.value ? const Color(0x66E8E2D4) : Colors.transparent,
-            borderRadius: BorderRadius.circular(3),
-            border: Border.all(color: const Color(0x55B8892A)),
+            color: hover.value ? const Color(0x332DD4BF) : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0x552DD4BF)),
           ),
           child: Text(
             'Настройки',
@@ -586,8 +635,8 @@ class _DesktopHomePageState extends State<DesktopHomePage>
               fontSize: 14,
               fontWeight: FontWeight.w700,
               color: hover.value
-                  ? const Color(0xFF12161C)
-                  : const Color(0xFF12161C).withOpacity(0.7),
+                  ? const Color(0xFFE8F4FF)
+                  : const Color(0xFFE8F4FF).withOpacity(0.7),
             ),
           ),
         ),
@@ -627,9 +676,9 @@ class _DesktopHomePageState extends State<DesktopHomePage>
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: const Color(0xFFE8E2D4),
-            borderRadius: BorderRadius.circular(3),
-            border: Border.all(color: const Color(0x3312161C)),
+            color: const Color(0xFF0C1422),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0x338BA0B8)),
           ),
           child: Row(
             children: [
@@ -670,7 +719,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                           Icons.refresh,
                           color: refreshHover.value
                               ? textColor
-                              : const Color(0xFF8F6A1C),
+                              : const Color(0xFF2DD4BF),
                           size: 22,
                         ))),
                   ),
@@ -685,7 +734,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                         Icons.edit_outlined,
                         color: editHover.value
                             ? textColor
-                            : const Color(0xFF8F6A1C),
+                            : const Color(0xFF2DD4BF),
                         size: 22,
                       ),
                     ),
@@ -1385,7 +1434,7 @@ class _DeskForcePaperGridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0x1412161C)
+      ..color = const Color(0x148BA0B8)
       ..strokeWidth = 1;
     const step = 28.0;
     for (double x = 0; x < size.width; x += step) {
@@ -1396,9 +1445,10 @@ class _DeskForcePaperGridPainter extends CustomPainter {
     }
     final wash = Paint()
       ..shader = const LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [Color(0x00F3EFE6), Color(0xAAF3EFE6)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0x00070B14), Color(0x332DD4BF), Color(0x99070B14)],
+        stops: [0.0, 0.55, 1.0],
       ).createShader(Offset.zero & size);
     canvas.drawRect(Offset.zero & size, wash);
   }

@@ -4,12 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/common/deskforce_startup.dart';
 import 'package:flutter_hbb/common/deskforce_update.dart';
+import 'package:flutter_hbb/consts.dart';
+import 'package:flutter_hbb/desktop/pages/cabinet/cabinet_theme.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet/click_sound.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet_webview_page.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-/// DeskForce paper/brass settings — single scroll of cards, no RustDesk left-nav chrome.
+/// DeskForce slate/teal settings — single scroll, site visual language.
 class DeskForceSettingsPage extends StatefulWidget {
   const DeskForceSettingsPage({Key? key}) : super(key: key);
 
@@ -18,15 +20,16 @@ class DeskForceSettingsPage extends StatefulWidget {
 }
 
 class _DeskForceSettingsPageState extends State<DeskForceSettingsPage> {
-  static const _ink = Color(0xFF12161C);
-  static const _paper = Color(0xFFF3EFE6);
-  static const _card = Color(0xFFFBF8F1);
-  static const _brass = Color(0xFFB8892A);
+  static const _ink = DfCabinetTheme.ink;
+  static const _paper = DfCabinetTheme.paper;
+  static const _card = Color(0xFF0C1422);
+  static const _brass = DfCabinetTheme.brass;
 
   bool _autostart = false;
   bool _startTray = false;
   bool _startFs = true; // default ON
   bool _clickSound = false; // default OFF
+  bool _hideOnLan = false; // Deny LAN discovery → enable-lan-discovery = N
   bool _busy = false;
 
   @override
@@ -37,12 +40,21 @@ class _DeskForceSettingsPageState extends State<DeskForceSettingsPage> {
 
   Future<void> _load() async {
     final auto = await dfIsWindowsAutostartEnabled();
+    // "Deny LAN discovery" in stock UI: reverse of enable-lan-discovery
+    final lanEnabled = mainGetBoolOptionSync(kOptionEnableLanDiscovery);
     setState(() {
       _autostart = auto || dfLocalBool(kDfAutostart);
       _startTray = dfLocalBool(kDfStartInTray);
       _startFs = dfLocalBoolDefaultOn(kDfStartFullscreen);
       _clickSound = dfClickSoundEnabled();
+      _hideOnLan = !lanEnabled;
     });
+  }
+
+  Future<void> _setHideOnLan(bool hide) async {
+    // hide=true → enable-lan-discovery = N (do not answer LAN pings)
+    await mainSetBoolOption(kOptionEnableLanDiscovery, !hide);
+    setState(() => _hideOnLan = !mainGetBoolOptionSync(kOptionEnableLanDiscovery));
   }
 
   @override
@@ -50,7 +62,7 @@ class _DeskForceSettingsPageState extends State<DeskForceSettingsPage> {
     return Container(
       color: _paper,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(32, 28, 32, 40),
+        padding: const EdgeInsets.fromLTRB(28, 24, 28, 40),
         children: [
           const Text(
             'Настройки DeskForce',
@@ -63,7 +75,7 @@ class _DeskForceSettingsPageState extends State<DeskForceSettingsPage> {
           ),
           const SizedBox(height: 6),
           Text(
-            'Запуск, окно и обновления — без лишних вкладок.',
+            'Запуск, окно, локальная сеть и обновления.',
             style: TextStyle(fontSize: 15, color: _ink.withOpacity(0.55)),
           ),
           const SizedBox(height: 28),
@@ -125,7 +137,7 @@ class _DeskForceSettingsPageState extends State<DeskForceSettingsPage> {
                 if (v) await dfPlayClickSound();
               },
             ),
-            const Divider(height: 24),
+            const Divider(height: 24, color: Color(0x338BA0B8)),
             ListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('Полный экран сейчас',
@@ -136,9 +148,22 @@ class _DeskForceSettingsPageState extends State<DeskForceSettingsPage> {
                       TextStyle(color: _ink.withOpacity(0.55), fontSize: 14)),
               trailing: TextButton(
                 onPressed: () => dfToggleFullscreen(),
+                style: TextButton.styleFrom(foregroundColor: _brass),
                 child: const Text('Переключить',
                     style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
               ),
+            ),
+          ]),
+          const SizedBox(height: 28),
+          _sectionTitle('Локальная сеть'),
+          const SizedBox(height: 12),
+          _cardBox(children: [
+            _toggle(
+              title: 'Не видно в локальной сети',
+              subtitle:
+                  'Не отвечать на поиск устройств в LAN — другие ПК в этой сети не увидят этот компьютер',
+              value: _hideOnLan,
+              onChanged: (v) => _setHideOnLan(v),
             ),
           ]),
           const SizedBox(height: 28),
@@ -157,7 +182,7 @@ class _DeskForceSettingsPageState extends State<DeskForceSettingsPage> {
               trailing: ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _brass,
-                  foregroundColor: Colors.white,
+                  foregroundColor: const Color(0xFF041016),
                   elevation: 0,
                   padding:
                       const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
@@ -238,12 +263,16 @@ class _DeskForceSettingsPageState extends State<DeskForceSettingsPage> {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(18),
-            decoration: const BoxDecoration(color: Color(0xFFF5C518)),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0C1422),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0x332DD4BF)),
+            ),
             child: const Text(
               'Copyright © 2026 DeskForce УД\nDeskForce — удалённый доступ для вашей команды',
               style: TextStyle(
-                color: Color(0xFF111111),
-                fontWeight: FontWeight.w700,
+                color: _ink,
+                fontWeight: FontWeight.w600,
                 fontSize: 14,
                 height: 1.45,
               ),
@@ -261,7 +290,7 @@ class _DeskForceSettingsPageState extends State<DeskForceSettingsPage> {
         fontSize: 13,
         fontWeight: FontWeight.w800,
         letterSpacing: 1.4,
-        color: Color(0xFF8F6A1C),
+        color: _brass,
       ),
     );
   }
@@ -289,12 +318,12 @@ class _DeskForceSettingsPageState extends State<DeskForceSettingsPage> {
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
       decoration: BoxDecoration(
-        color: _card,
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: const Color(0x3312161C)),
+        color: _card.withOpacity(0.84),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0x338BA0B8)),
         boxShadow: const [
           BoxShadow(
-              color: Color(0x1412161C), blurRadius: 16, offset: Offset(0, 6)),
+              color: Color(0x66000000), blurRadius: 18, offset: Offset(0, 8)),
         ],
       ),
       child: Column(children: children),
