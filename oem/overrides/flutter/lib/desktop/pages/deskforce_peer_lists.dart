@@ -95,9 +95,7 @@ class _DeskForcePeerListsState extends State<DeskForcePeerLists> {
 
   @override
   Widget build(BuildContext context) {
-    // Prefer theme primary (slate/teal restyle) when available.
-    final themeAccent = Theme.of(context).colorScheme.primary;
-    final labelColor = themeAccent == Colors.blue ? _brass : themeAccent;
+    final labelColor = Theme.of(context).colorScheme.primary;
 
     return Container(
       width: double.infinity,

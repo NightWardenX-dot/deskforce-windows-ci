@@ -12,15 +12,19 @@ import 'package:flutter_hbb/desktop/pages/cabinet/screens/support_screen.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet/screens/updates_screen.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet/screens/news_screen.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet/screens/chat_screen.dart';
+import 'package:flutter_hbb/desktop/pages/cabinet/screens/address_book_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-enum CabinetSection { overview, devices, chat, news, updates, billing, support, profile }
+enum CabinetSection { overview, devices, addressBook, chat, news, updates, billing, support, profile }
 
 CabinetSection cabinetSectionFromUrl(String url) {
   final u = url.toLowerCase();
   if (u.contains('/billing')) return CabinetSection.billing;
   if (u.contains('/support')) return CabinetSection.support;
   if (u.contains('/devices')) return CabinetSection.devices;
+  if (u.contains('/address-book') || u.contains('/address_book')) {
+    return CabinetSection.addressBook;
+  }
   if (u.contains('/chat')) return CabinetSection.chat;
   if (u.contains('/news')) return CabinetSection.news;
   if (u.contains('/updates') || u.contains('/changelog')) {
@@ -74,6 +78,10 @@ class _DeskForceCabinetPageState extends State<DeskForceCabinetPage> {
       case 'devices':
         _go(CabinetSection.devices);
         break;
+      case 'address-book':
+      case 'address_book':
+        _go(CabinetSection.addressBook);
+        break;
       case 'chat':
         _go(CabinetSection.chat);
         break;
@@ -111,6 +119,8 @@ class _DeskForceCabinetPageState extends State<DeskForceCabinetPage> {
         return widget.title;
       case CabinetSection.devices:
         return 'Устройства';
+      case CabinetSection.addressBook:
+        return 'Адресная книга';
       case CabinetSection.chat:
         return 'Чат';
       case CabinetSection.news:
@@ -235,6 +245,11 @@ class _DeskForceCabinetPageState extends State<DeskForceCabinetPage> {
         'label': 'Устройства',
       },
       {
+        'section': CabinetSection.addressBook,
+        'icon': Icons.contacts_outlined,
+        'label': 'Адресная книга',
+      },
+      {
         'section': CabinetSection.chat,
         'icon': Icons.chat_bubble_outline,
         'label': 'Чат',
@@ -331,6 +346,8 @@ class _DeskForceCabinetPageState extends State<DeskForceCabinetPage> {
         return CabinetOverviewScreen(onNavigate: _goNamed);
       case CabinetSection.devices:
         return const CabinetDevicesScreen();
+      case CabinetSection.addressBook:
+        return const CabinetAddressBookScreen();
       case CabinetSection.chat:
         return const CabinetChatScreen();
       case CabinetSection.news:

@@ -204,6 +204,54 @@ class DfCabinetSession extends GetxController {
     return '';
   }
 
+
+  /// Sync cabinet JWT into RustDesk `access_token` / `user_info` so /api/ab works
+  /// while stock Account UI stays disabled (disable-account).
+  Future<void> _syncRustdeskAbAuth({required bool active}) async {
+    try {
+      if (!active) {
+        await bind.mainSetLocalOption(key: 'access_token', value: '');
+        await bind.mainSetLocalOption(key: 'user_info', value: '');
+        try {
+          gFFI.userModel.userName.value = '';
+          gFFI.userModel.displayName.value = '';
+        } catch (_) {}
+        try {
+          await gFFI.abModel.reset();
+        } catch (_) {}
+        return;
+      }
+      final token = CabinetApi.instance.token;
+      if (token.isEmpty) return;
+      final name = username.value.isNotEmpty
+          ? username.value
+          : (displayName.value.isNotEmpty ? displayName.value : 'user');
+      final info = {
+        'name': name,
+        'display_name':
+            displayName.value.isNotEmpty ? displayName.value : name,
+        'email': email.value,
+        'status': 1,
+        'is_admin': false,
+      };
+      await bind.mainSetLocalOption(key: 'access_token', value: token);
+      await bind.mainSetLocalOption(key: 'user_info', value: jsonEncode(info));
+      try {
+        gFFI.userModel.userName.value = name;
+        gFFI.userModel.displayName.value =
+            displayName.value.isNotEmpty ? displayName.value : name;
+      } catch (_) {}
+      try {
+        await gFFI.abModel
+            .pullAb(force: ForcePullAb.listAndCurrent, quiet: true);
+      } catch (e) {
+        debugPrint('ab pull after cabinet login: $e');
+      }
+    } catch (e) {
+      debugPrint('_syncRustdeskAbAuth: $e');
+    }
+  }
+
   void _clear() {
     // ignore: unawaited_futures
     _syncRustdeskAbAuth(active: false);
