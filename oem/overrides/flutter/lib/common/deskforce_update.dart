@@ -147,9 +147,11 @@ class DeskForceUpdateInfo {
       available && (_isAllowedUrl(downloadUrl) || _isAllowedUrl(archiveUrl));
 
   String get preferredDownloadUrl {
-    if (Platform.isWindows && _isAllowedUrl(archiveUrl)) return archiveUrl;
+    // Prefer the single-file Windows portable (DeskForce.exe). Zip+folder replace
+    // is only used when the client is already running from an unpacked bundle.
     if (_isAllowedUrl(downloadUrl)) return downloadUrl;
-    return archiveUrl;
+    if (_isAllowedUrl(archiveUrl)) return archiveUrl;
+    return '';
   }
 }
 
@@ -359,40 +361,145 @@ Future<void> _hideUpdateProgress(BuildContext context) async {
 
 String _psQuote(String value) => value.replaceAll("'", "''");
 
-Future<void> _applyWindowsPortableUpdate(String zipUrl) async {
-  final uri = Uri.parse(zipUrl);
+Future<void> _downloadToFile(Uri uri, String path) async {
+  final client = HttpClient();
+  try {
+    final req = await client.getUrl(uri).timeout(const Duration(seconds: 30));
+    final resp = await req.close().timeout(const Duration(minutes: 5));
+    if (resp.statusCode != 200) {
+      throw Exception('HTTP ${resp.statusCode}');
+    }
+    final file = File(path);
+    final sink = file.openWrite();
+    try {
+      await resp.pipe(sink);
+    } catch (_) {
+      await sink.close();
+      rethrow;
+    }
+  } finally {
+    client.close(force: true);
+  }
+}
+
+bool _windowsLooksLikeFolderBundle(String exePath) {
+  final dir = File(exePath).parent.path;
+  final assets = Directory(p.join(dir, 'data', 'flutter_assets'));
+  final data = Directory(p.join(dir, 'data'));
+  return assets.existsSync() || data.existsSync();
+}
+
+bool _windowsLooksLikePortableExtract(String exePath) {
+  final lower = exePath.replaceAll('/', '\\').toLowerCase();
+  if (lower.contains('\\deskforce\\') || lower.contains('\\rustdesk\\')) {
+    return true;
+  }
+  final packerName = Platform.environment['RUSTDESK_APPNAME'];
+  if (packerName != null && packerName.trim().isNotEmpty) return true;
+  final packerExe = Platform.environment['DESKFORCE_PACKER_EXE'];
+  if (packerExe != null && packerExe.trim().isNotEmpty) return true;
+  return false;
+}
+
+String? _windowsPackerExePath() {
+  final fromEnv = Platform.environment['DESKFORCE_PACKER_EXE']?.trim();
+  if (fromEnv != null && fromEnv.isNotEmpty && File(fromEnv).existsSync()) {
+    return fromEnv;
+  }
+  return null;
+}
+
+String _windowsExtractCacheDir(String resolvedExe) {
+  final local = Platform.environment['LOCALAPPDATA']?.trim();
+  if (local != null && local.isNotEmpty) {
+    return p.join(local, 'deskforce');
+  }
+  return File(resolvedExe).parent.path;
+}
+
+/// Returns true when a detached updater was started and the app should exit.
+Future<bool> _applyWindowsUpdate(DeskForceUpdateInfo info) async {
+  final currentExe = Platform.resolvedExecutable;
   final tempDir = await getTemporaryDirectory();
   final stamp = DateTime.now().millisecondsSinceEpoch;
-  final zipPath = p.join(tempDir.path, 'deskforce-update-$stamp.zip');
-  final unpackDir = p.join(tempDir.path, 'deskforce-update-$stamp');
   final scriptPath = p.join(tempDir.path, 'deskforce-update-$stamp.ps1');
-  final currentExe = Platform.resolvedExecutable;
-  final currentDir = File(currentExe).parent.path;
 
-  final resp = await http.get(uri).timeout(const Duration(minutes: 3));
-  if (resp.statusCode != 200) {
-    throw Exception('HTTP ${resp.statusCode}');
-  }
-  await File(zipPath).writeAsBytes(resp.bodyBytes, flush: true);
-  final unpack = Directory(unpackDir);
-  if (await unpack.exists()) {
-    await unpack.delete(recursive: true);
-  }
-  await unpack.create(recursive: true);
+  final packer = _windowsPackerExePath();
+  final portable = _windowsLooksLikePortableExtract(currentExe);
+  final folder = _windowsLooksLikeFolderBundle(currentExe) && !portable;
 
-  final ps = '''
+  if (folder && _isAllowedUrl(info.archiveUrl)) {
+    final zipPath = p.join(tempDir.path, 'deskforce-update-$stamp.zip');
+    final unpackDir = p.join(tempDir.path, 'deskforce-update-$stamp');
+    await _downloadToFile(Uri.parse(info.archiveUrl), zipPath);
+    final unpack = Directory(unpackDir);
+    if (await unpack.exists()) {
+      await unpack.delete(recursive: true);
+    }
+    await unpack.create(recursive: true);
+    final dest = File(currentExe).parent.path;
+    final ps = '''
 \$ErrorActionPreference = 'Stop'
 Start-Sleep -Milliseconds 1200
 \$zip = '${_psQuote(zipPath)}'
 \$src = '${_psQuote(unpackDir)}'
-\$dest = '${_psQuote(currentDir)}'
+\$dest = '${_psQuote(dest)}'
 \$exe = '${_psQuote(currentExe)}'
 Expand-Archive -Path \$zip -DestinationPath \$src -Force
+\$payload = \$src
+\$nested = Get-ChildItem -Path \$src -Directory -ErrorAction SilentlyContinue | Select-Object -First 1
+if (\$null -ne \$nested -and -not (Test-Path (Join-Path \$src 'DeskForce.exe')) -and (Test-Path (Join-Path \$nested.FullName 'DeskForce.exe'))) {
+  \$payload = \$nested.FullName
+}
 for (\$i = 0; \$i -lt 80; \$i++) {
   try {
-    Copy-Item -Path (Join-Path \$src '*') -Destination \$dest -Recurse -Force -ErrorAction Stop
+    Copy-Item -Path (Join-Path \$payload '*') -Destination \$dest -Recurse -Force -ErrorAction Stop
     Start-Sleep -Milliseconds 250
     Start-Process -FilePath \$exe
+    exit 0
+  } catch {
+    Start-Sleep -Milliseconds 500
+  }
+}
+throw 'copy_failed'
+''';
+    await File(scriptPath).writeAsString(ps, flush: true);
+    await Process.start(
+      'powershell',
+      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath],
+      mode: ProcessStartMode.detached,
+    );
+    return true;
+  }
+
+  // Single-file portable (typical DeskForce.exe download): replace the packer EXE.
+  final exeUrl = _isAllowedUrl(info.downloadUrl)
+      ? info.downloadUrl
+      : info.preferredDownloadUrl;
+  if (!_isAllowedUrl(exeUrl) || !exeUrl.toLowerCase().endsWith('.exe')) {
+    return false;
+  }
+  if (packer == null) {
+    // Older packers do not expose DESKFORCE_PACKER_EXE — cannot safely replace.
+    return false;
+  }
+  final newExePath = p.join(tempDir.path, 'deskforce-update-$stamp.exe');
+  await _downloadToFile(Uri.parse(exeUrl), newExePath);
+  final extractDir = _windowsExtractCacheDir(currentExe);
+  final ps = '''
+\$ErrorActionPreference = 'Stop'
+Start-Sleep -Milliseconds 1500
+\$src = '${_psQuote(newExePath)}'
+\$dest = '${_psQuote(packer)}'
+\$extract = '${_psQuote(extractDir)}'
+for (\$i = 0; \$i -lt 100; \$i++) {
+  try {
+    Copy-Item -Path \$src -Destination \$dest -Force -ErrorAction Stop
+    if (Test-Path \$extract) {
+      Remove-Item -Path \$extract -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    Start-Sleep -Milliseconds 300
+    Start-Process -FilePath \$dest
     exit 0
   } catch {
     Start-Sleep -Milliseconds 500
@@ -406,6 +513,7 @@ throw 'copy_failed'
     ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath],
     mode: ProcessStartMode.detached,
   );
+  return true;
 }
 
 Future<void> dfDownloadAndExecute(BuildContext context, DeskForceUpdateInfo info) async {
@@ -414,14 +522,22 @@ Future<void> dfDownloadAndExecute(BuildContext context, DeskForceUpdateInfo info
   try {
     await _showUpdateProgress(
       context,
-      Platform.isWindows && info.archiveUrl.isNotEmpty
-          ? 'Устанавливаем обновление...'
-          : 'Открываем обновление...',
+      Platform.isWindows ? 'Устанавливаем обновление...' : 'Открываем обновление...',
     );
-    if (Platform.isWindows && info.archiveUrl.isNotEmpty) {
-      await _applyWindowsPortableUpdate(info.archiveUrl);
+    if (Platform.isWindows) {
+      final started = await _applyWindowsUpdate(info);
       await _hideUpdateProgress(context);
-      exit(0);
+      if (started) {
+        exit(0);
+      }
+      if (context.mounted) {
+        await _toast(
+          context,
+          'Автоустановка недоступна в этой сборке. Скачайте DeskForce.exe вручную и замените файл.',
+        );
+        await launchUrl(Uri.parse(preferredUrl), mode: LaunchMode.externalApplication);
+      }
+      return;
     }
     await launchUrl(Uri.parse(preferredUrl), mode: LaunchMode.externalApplication);
     await _hideUpdateProgress(context);
@@ -429,7 +545,13 @@ Future<void> dfDownloadAndExecute(BuildContext context, DeskForceUpdateInfo info
     debugPrint('DeskForce direct update failed: $e');
     await _hideUpdateProgress(context);
     if (context.mounted) {
-      await launchUrl(Uri.parse(preferredUrl), mode: LaunchMode.externalApplication);
+      await _toast(
+        context,
+        'Не удалось установить обновление. Откроем загрузку DeskForce.exe.',
+      );
+      try {
+        await launchUrl(Uri.parse(preferredUrl), mode: LaunchMode.externalApplication);
+      } catch (_) {}
     }
   }
 }

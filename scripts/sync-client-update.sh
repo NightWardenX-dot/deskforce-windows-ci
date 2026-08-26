@@ -106,8 +106,7 @@ cat > "$OUT/update.json" <<JSON
       "mandatory": false,
       "download_url": "$win_exe",
       "download_urls": {
-        "exe": "$win_exe",
-        "zip": "$win_zip"
+        "exe": "$win_exe"
       },
       "release_notes": $(python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$NOTES_WIN"),
       "available": $win_available

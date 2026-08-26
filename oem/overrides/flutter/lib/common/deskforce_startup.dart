@@ -1,10 +1,12 @@
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:window_size/window_size.dart' as window_size;
 
 const kDfAutostart = 'df-autostart';
 const kDfStartInTray = 'df-start-in-tray';
@@ -78,6 +80,40 @@ Future<bool> dfIsWindowsAutostartEnabled() async {
   }
 }
 
+
+/// Primary-monitor work area (excludes taskbar). Falls back to a safe laptop size.
+Future<Size> _workAreaSize() async {
+  try {
+    final screens = await window_size.getScreenList();
+    if (screens.isNotEmpty) {
+      // Prefer the screen that currently hosts the window; else first.
+      window_size.Screen screen = screens.first;
+      try {
+        final info = await window_size.getWindowInfo();
+        final host = info.screen;
+        if (host != null) screen = host;
+      } catch (_) {}
+      final vf = screen.visibleFrame;
+      if (vf.width >= 320 && vf.height >= 240) {
+        return Size(vf.width, vf.height);
+      }
+    }
+  } catch (e) {
+    debugPrint('workAreaSize failed: $e');
+  }
+  return const Size(1280, 720);
+}
+
+Future<void> _applySafeMinSize(Size work) async {
+  // Never force a min size larger than the work area — that clips the window
+  // on 1366x768 / high-DPI laptops (beta.13 symptom).
+  final minW = math.min(480.0, math.max(320.0, work.width * 0.45));
+  final minH = math.min(360.0, math.max(240.0, work.height * 0.45));
+  try {
+    await windowManager.setMinimumSize(Size(minW, minH));
+  } catch (_) {}
+}
+
 Future<bool> _tryMaximize() async {
   try {
     if (await windowManager.isFullScreen()) {
@@ -88,6 +124,7 @@ Future<bool> _tryMaximize() async {
   try {
     if (!(await windowManager.isMaximized())) {
       await windowManager.maximize();
+      await Future.delayed(const Duration(milliseconds: 40));
     }
     final ok = await windowManager.isMaximized();
     if (ok) {
@@ -100,14 +137,27 @@ Future<bool> _tryMaximize() async {
   }
 }
 
+/// Fit ~95% of work area, centered — used when maximize is unavailable.
+Future<void> _fitWorkArea(Size work) async {
+  final w = math.max(480.0, work.width * 0.95);
+  final h = math.max(360.0, work.height * 0.95);
+  try {
+    await windowManager.setSize(Size(w, h));
+    await windowManager.setAlignment(Alignment.center);
+  } catch (e) {
+    debugPrint('fitWorkArea failed: $e');
+  }
+}
+
 /// Apply tray / maximized / size after the main window is ready.
 ///
 /// Windows drops maximize when requested before show. Show first, then
-/// maximize with post-frame retries so the window actually sticks maximized.
+/// maximize with post-frame retries. Fixed 960x860 defaults were larger than
+/// many laptop work areas and left the window clipped off-screen.
 Future<void> dfApplyStartupWindowBehavior() async {
   try {
-    await windowManager.setMinimumSize(const Size(720, 640));
-    const target = Size(960, 860);
+    final work = await _workAreaSize();
+    await _applySafeMinSize(work);
 
     if (dfLocalBool(kDfStartInTray)) {
       await windowManager.hide();
@@ -121,7 +171,7 @@ Future<void> dfApplyStartupWindowBehavior() async {
     // Default ON: expand to work-area (maximize). Exclusive fullscreen
     // remains available via «Полный экран сейчас» in settings.
     if (dfLocalBoolDefaultOn(kDfStartFullscreen)) {
-      for (final delayMs in <int>[0, 50, 150, 400, 900]) {
+      for (final delayMs in <int>[0, 80, 200, 450, 900]) {
         if (delayMs > 0) {
           await Future.delayed(Duration(milliseconds: delayMs));
         }
@@ -129,17 +179,13 @@ Future<void> dfApplyStartupWindowBehavior() async {
           return;
         }
       }
-      try {
-        await windowManager.setFullScreen(true);
-      } catch (_) {}
+      // Do NOT fall back to exclusive fullscreen — that feels broken and
+      // still fails when the initial size exceeded the work area. Fit instead.
+      await _fitWorkArea(work);
       return;
     }
 
-    final cur = await windowManager.getSize();
-    if (cur.width < 900 || cur.height < 780) {
-      await windowManager.setSize(target);
-    }
-    await windowManager.setAlignment(Alignment.center);
+    await _fitWorkArea(work);
   } catch (e) {
     debugPrint('startup window behavior: $e');
   }

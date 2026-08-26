@@ -1446,6 +1446,28 @@ def apply_git_patches(src: pathlib.Path, patches_dir: pathlib.Path) -> None:
 
 
 
+def patch_portable_packer_source_exe_env(src: pathlib.Path) -> None:
+    """Expose the original DeskForce.exe path to the Flutter updater."""
+    path = src / "libs" / "portable" / "src" / "main.rs"
+    if not path.is_file():
+        return
+    text = path.read_text(encoding="utf-8", errors="ignore")
+    marker = "cmd.env(APPNAME_RUNTIME_ENV_KEY, exe_name);"
+    inject = (
+        marker
+        + "\n    // DeskForce: full path of the single-file packer for in-place updates."
+        + '\n    cmd.env("DESKFORCE_PACKER_EXE", exe.to_string_lossy().as_ref());'
+    )
+    if "DESKFORCE_PACKER_EXE" in text:
+        print("OK already: DESKFORCE_PACKER_EXE env")
+        return
+    if marker not in text:
+        print("WARN: portable env marker miss", file=sys.stderr)
+        return
+    path.write_text(text.replace(marker, inject, 1), encoding="utf-8")
+    print("Patched: portable DESKFORCE_PACKER_EXE env")
+
+
 def patch_portable_extract_dir(src: pathlib.Path, app_name: str = "DeskForce") -> None:
     """Avoid colliding with stock RustDesk %LOCALAPPDATA%/rustdesk extract cache."""
     path = src / "libs" / "portable" / "src" / "main.rs"
@@ -1485,7 +1507,7 @@ def patch_main_window_startup(src: pathlib.Path) -> None:
         "WindowOptions windowOptions = getHiddenTitleBarWindowOptions(\n"
         "      isMainWindow: true,\n"
         "      alwaysOnTop: alwaysOnTop,\n"
-        "      size: const Size(960, 860),\n"
+        "      size: const Size(800, 600),\n"
         "      center: true);"
     )
     if needle in text:
@@ -1498,7 +1520,7 @@ def patch_main_window_startup(src: pathlib.Path) -> None:
             "    await restoreWindowPosition(WindowType.Main);\n",
             "    // DeskForce: min size only; maximize/size handled in dfApplyStartupWindowBehavior.\n"
             "    try {\n"
-            "      await windowManager.setMinimumSize(const Size(720, 640));\n"
+            "      await windowManager.setMinimumSize(const Size(480, 360));\n"
             "    } catch (_) {\n"
             "      await restoreWindowPosition(WindowType.Main);\n"
             "    }\n",
@@ -1522,8 +1544,8 @@ def patch_main_window_startup(src: pathlib.Path) -> None:
     old_size = (
         "    // DeskForce: large centered window (skip tiny stock restore).\n"
         "    try {\n"
-        "      await windowManager.setMinimumSize(const Size(720, 640));\n"
-        "      await windowManager.setSize(const Size(960, 860));\n"
+        "      await windowManager.setMinimumSize(const Size(480, 360));\n"
+        "      await windowManager.setSize(const Size(800, 600));\n"
         "      await windowManager.setAlignment(Alignment.center);\n"
         "    } catch (_) {\n"
         "      await restoreWindowPosition(WindowType.Main);\n"
@@ -1532,7 +1554,7 @@ def patch_main_window_startup(src: pathlib.Path) -> None:
     new_size = (
         "    // DeskForce: min size only; maximize/size handled in dfApplyStartupWindowBehavior.\n"
         "    try {\n"
-        "      await windowManager.setMinimumSize(const Size(720, 640));\n"
+        "      await windowManager.setMinimumSize(const Size(480, 360));\n"
         "    } catch (_) {\n"
         "      await restoreWindowPosition(WindowType.Main);\n"
         "    }\n"
@@ -1695,6 +1717,7 @@ def main() -> int:
             print("Patched: lightTheme uses ColorThemeExtension.light")
 
     patch_portable_extract_dir(src, app_name)
+    patch_portable_packer_source_exe_env(src)
     patch_main_window_startup(src)
     patch_fullscreen_toggle(src)
     patch_disable_maximize_gate(src)
