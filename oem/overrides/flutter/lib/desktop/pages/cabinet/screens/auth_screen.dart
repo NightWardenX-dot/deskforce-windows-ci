@@ -355,7 +355,7 @@ class _CabinetAuthScreenState extends State<CabinetAuthScreen> {
                     dense: true,
                     activeColor: DfCabinetTheme.brass,
                     title: const Text('Запомнить меня',
-                        style: TextStyle(fontSize: 14)),
+                        style: TextStyle(fontSize: 14, color: DfCabinetTheme.ink)),
                     value: _remember,
                     onChanged: (v) => setState(() => _remember = v ?? true),
                     controlAffinity: ListTileControlAffinity.leading,

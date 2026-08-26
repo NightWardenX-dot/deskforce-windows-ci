@@ -33,6 +33,19 @@ class DfCabinetTheme {
           bodyLarge: inputStyle,
           bodyMedium: inputStyle,
           titleMedium: inputStyle,
+          labelLarge: inputStyle,
+          labelMedium: hintStyle,
+        ),
+        inputDecorationTheme: const InputDecorationTheme(
+          filled: true,
+          fillColor: Color(0xFF111827),
+          labelStyle: TextStyle(color: Color(0xFFE8F4FF), fontSize: 15),
+          floatingLabelStyle: TextStyle(color: brass, fontSize: 14),
+          hintStyle: hintStyle,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.all(Radius.circular(10)),
+            borderSide: BorderSide(color: border),
+          ),
         ),
         textSelectionTheme: TextSelectionThemeData(
           cursorColor: brass,
@@ -44,7 +57,7 @@ class DfCabinetTheme {
   static InputDecoration field(String label, {String? hint}) => InputDecoration(
         labelText: label,
         hintText: hint,
-        labelStyle: TextStyle(color: ink.withOpacity(0.65)),
+        labelStyle: const TextStyle(color: Color(0xFFE8F4FF), fontSize: 15),
         hintStyle: hintStyle,
         floatingLabelStyle: TextStyle(color: brass),
         filled: true,
