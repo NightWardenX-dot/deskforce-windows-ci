@@ -1125,8 +1125,87 @@ def normalize_semver(version: str) -> str:
     return core_norm
 
 
+def windows_file_version_numeric(version: str) -> str:
+    """Map semver to FILEVERSION tuple (prerelease is not numeric on Windows)."""
+    core = normalize_semver(version).split("-")[0].split("+")[0]
+    nums: list[int] = []
+    for part in core.split("."):
+        m = re.match(r"(\d+)", part)
+        nums.append(int(m.group(1)) if m else 0)
+    while len(nums) < 4:
+        nums.append(0)
+    return ",".join(str(n) for n in nums[:4])
+
+
+def windows_file_version_dotted(version: str) -> str:
+    return windows_file_version_numeric(version).replace(",", ".")
+
+
+def patch_runner_rc_version(src: pathlib.Path, semver: str) -> None:
+    """Windows Explorer reads Runner.rc VERSIONINFO (inner Flutter runner)."""
+    runner_rc = src / "flutter" / "windows" / "runner" / "Runner.rc"
+    if not runner_rc.is_file():
+        return
+    text = runner_rc.read_text(encoding="utf-8", errors="ignore")
+    file_num = windows_file_version_numeric(semver)
+    oem_block = f"""// DESKFORCE_OEM_VERSION_BEGIN
+#undef VERSION_AS_NUMBER
+#undef VERSION_AS_STRING
+#define VERSION_AS_NUMBER {file_num}
+#define VERSION_AS_STRING "{semver}"
+// DESKFORCE_OEM_VERSION_END
+"""
+    if "DESKFORCE_OEM_VERSION_BEGIN" in text:
+        text = re.sub(
+            r"// DESKFORCE_OEM_VERSION_BEGIN[\s\S]*?// DESKFORCE_OEM_VERSION_END\n",
+            oem_block,
+            text,
+            count=1,
+        )
+        print(f"Patched: Runner.rc OEM version={semver}")
+    elif "VS_VERSION_INFO VERSIONINFO" in text:
+        text = text.replace(
+            "VS_VERSION_INFO VERSIONINFO",
+            oem_block + "VS_VERSION_INFO VERSIONINFO",
+            1,
+        )
+        print(f"Patched: Runner.rc OEM version={semver}")
+    else:
+        print("WARN: Runner.rc VERSIONINFO anchor missing", file=sys.stderr)
+        return
+    runner_rc.write_text(text, encoding="utf-8")
+
+
+def patch_portable_packer_version(src: pathlib.Path, semver: str) -> None:
+    """Final DeskForce.exe is rustdesk-portable-packer — its winres sets Explorer metadata."""
+    portable = src / "libs" / "portable" / "Cargo.toml"
+    if not portable.is_file():
+        return
+    text = portable.read_text(encoding="utf-8", errors="ignore")
+    text2 = re.sub(r'(?m)^version = "[^"]*"', f'version = "{semver}"', text, count=1)
+    file_ver = windows_file_version_dotted(semver)
+    text2 = text2.replace('#ProductVersion = ""', f'ProductVersion = "{semver}"')
+    text2 = text2.replace('#FileVersion = ""', f'FileVersion = "{file_ver}"')
+    for key, val in (
+        ("ProductVersion", semver),
+        ("FileVersion", file_ver),
+    ):
+        pat = rf'(?m)^{key} = "[^"]*"'
+        if re.search(pat, text2):
+            text2 = re.sub(pat, f'{key} = "{val}"', text2, count=1)
+        elif "[package.metadata.winres]" in text2:
+            text2 = text2.replace(
+                "[package.metadata.winres]\n",
+                f'[package.metadata.winres]\n{key} = "{val}"\n',
+                1,
+            )
+    if text2 != text:
+        portable.write_text(text2, encoding="utf-8")
+        print(f"Patched: portable Cargo.toml version={semver} winres ProductVersion/FileVersion")
+
+
 def patch_version(src: pathlib.Path, version: str = "1.0") -> None:
-    """Branded app version for About / update checks. Cargo always gets X.Y.Z."""
+    """Branded app version for About / update checks / Windows VERSIONINFO."""
     semver = normalize_semver(version)
     cargo = src / "Cargo.toml"
     if cargo.is_file():
@@ -1164,6 +1243,8 @@ def patch_version(src: pathlib.Path, version: str = "1.0") -> None:
             encoding="utf-8",
         )
         print(f"Patched: src/version.rs VERSION={semver}")
+    patch_runner_rc_version(src, semver)
+    patch_portable_packer_version(src, semver)
 
 
 def patch_pubspec_webview(src: pathlib.Path) -> None:

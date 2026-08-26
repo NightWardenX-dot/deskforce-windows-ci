@@ -72,6 +72,15 @@ class _DesktopHomePageState extends State<DesktopHomePage>
             Positioned.fill(
               child: CustomPaint(painter: _DeskForcePaperGridPainter()),
             ),
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                bottom: false,
+                child: dfUpdateBannerHost(context),
+              ),
+            ),
             Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 760),

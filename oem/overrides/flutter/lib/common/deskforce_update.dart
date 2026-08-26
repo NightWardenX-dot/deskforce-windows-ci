@@ -18,6 +18,108 @@ const _paper = Color(0xFFF3EFE6);
 const _card = Color(0xFFFBF8F1);
 const _brass = Color(0xFFB8892A);
 
+
+class DeskForceUpdateBannerData {
+  DeskForceUpdateBannerData({required this.info, required this.localVersion});
+  final DeskForceUpdateInfo info;
+  final String localVersion;
+}
+
+/// Non-blocking update hint shown on the home screen (dismissible).
+final ValueNotifier<DeskForceUpdateBannerData?> dfUpdateBannerNotifier =
+    ValueNotifier<DeskForceUpdateBannerData?>(null);
+
+const _bannerDismissKey = 'df_update_banner_dismissed';
+
+Future<bool> _isBannerDismissed(String remoteVersion) async {
+  try {
+    final prefs = await bind.mainGetLocalOption(key: _bannerDismissKey);
+    return prefs.trim() == remoteVersion.trim();
+  } catch (_) {
+    return false;
+  }
+}
+
+Future<void> _dismissBanner(String remoteVersion) async {
+  dfUpdateBannerNotifier.value = null;
+  try {
+    await bind.mainSetLocalOption(key: _bannerDismissKey, value: remoteVersion);
+  } catch (_) {}
+}
+
+Future<void> dfShowUpdateBannerIfNeeded(
+  BuildContext context,
+  DeskForceUpdateInfo info,
+  String localVersion,
+) async {
+  if (await _isBannerDismissed(info.version)) return;
+  dfUpdateBannerNotifier.value =
+      DeskForceUpdateBannerData(info: info, localVersion: localVersion);
+}
+
+/// Subtle paper/brass banner — top of home screen, does not block connect flow.
+Widget dfUpdateBannerHost(BuildContext context) {
+  return ValueListenableBuilder<DeskForceUpdateBannerData?>(
+    valueListenable: dfUpdateBannerNotifier,
+    builder: (context, data, _) {
+      if (data == null) return const SizedBox.shrink();
+      final info = data.info;
+      return Material(
+        color: Colors.transparent,
+        child: Container(
+          width: double.infinity,
+          margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFBF8F1),
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(color: const Color(0x55B8892A)),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x12000000),
+                blurRadius: 8,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.system_update_alt, color: _brass, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Доступно обновление ${info.version}',
+                  style: TextStyle(
+                    color: _ink.withOpacity(0.86),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13.5,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () => dfShowUpdateDialog(context, info,
+                    localVersion: data.localVersion),
+                style: TextButton.styleFrom(
+                  foregroundColor: _brass,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                ),
+                child: const Text('Обновление',
+                    style: TextStyle(fontWeight: FontWeight.w800)),
+              ),
+              IconButton(
+                tooltip: 'Скрыть',
+                visualDensity: VisualDensity.compact,
+                icon: Icon(Icons.close, size: 18, color: _ink.withOpacity(0.45)),
+                onPressed: () => _dismissBanner(info.version),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
 class DeskForceUpdateInfo {
   DeskForceUpdateInfo({
     required this.platform,
@@ -200,7 +302,7 @@ Future<void> dfDownloadAndExecute(BuildContext context, String url) async {
   }
 }
 
-/// Silent startup check: show dialog only when a newer build is available.
+/// Silent startup check: non-intrusive banner when a newer build is available.
 Future<void> dfCheckUpdateOnStartup(BuildContext context) async {
   try {
     final local = await dfLocalAppVersion();
@@ -208,7 +310,7 @@ Future<void> dfCheckUpdateOnStartup(BuildContext context) async {
     if (info == null || !info.hasDownload) return;
     if (!dfIsNewerVersion(info.version, local)) return;
     if (!context.mounted) return;
-    await dfShowUpdateDialog(context, info, localVersion: local);
+    await dfShowUpdateBannerIfNeeded(context, info, local);
   } catch (e) {
     debugPrint('DeskForce update check: $e');
   }
@@ -253,6 +355,7 @@ Future<void> dfCheckUpdateManual(BuildContext context) async {
       await _toast(context, 'У вас актуальная версия DeskForce ($local).');
       return;
     }
+    await dfShowUpdateBannerIfNeeded(context, info, local);
     await dfShowUpdateDialog(context, info, localVersion: local);
   } catch (e) {
     if (context.mounted) {

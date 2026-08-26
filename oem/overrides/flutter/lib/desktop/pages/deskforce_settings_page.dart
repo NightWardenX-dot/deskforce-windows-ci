@@ -149,7 +149,7 @@ class _DeskForceSettingsPageState extends State<DeskForceSettingsPage> {
                       const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                 ),
                 onPressed: () => dfCheckUpdateManual(context),
-                child: const Text('Проверить',
+                child: const Text('Обновление',
                     style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
               ),
             ),
