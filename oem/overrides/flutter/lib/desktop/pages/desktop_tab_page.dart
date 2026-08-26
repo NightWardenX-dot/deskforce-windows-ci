@@ -3,6 +3,7 @@ import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_home_page.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_setting_page.dart' show SettingsTabKey;
+import 'package:flutter_hbb/desktop/pages/cabinet_webview_page.dart';
 import 'package:flutter_hbb/desktop/pages/deskforce_settings_page.dart';
 import 'package:flutter_hbb/desktop/widgets/tabbar_widget.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
@@ -17,6 +18,15 @@ class DesktopTabPage extends StatefulWidget {
 
   @override
   State<DesktopTabPage> createState() => _DesktopTabPageState();
+
+
+  /// Open native «Личный кабинет» tab (never external browser).
+  static void onAddCabinet({
+    String url = 'https://deskforce.dr6ter.ru/cabinet/?embed=1',
+    String title = 'Личный кабинет',
+  }) {
+    openDeskForceCabinet(url: url, title: title);
+  }
 
   /// All settings entry points must open DeskForceSettingsPage only.
   static void onAddSetting({SettingsTabKey initialPage = SettingsTabKey.general}) {

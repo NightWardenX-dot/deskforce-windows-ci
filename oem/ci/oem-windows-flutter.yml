@@ -88,6 +88,11 @@ jobs:
           grep -q 'DeskForceCabinetPage' rustdesk/flutter/lib/desktop/pages/cabinet_webview_page.dart
           ! grep -q 'webview_windows' rustdesk/flutter/lib/desktop/pages/cabinet_webview_page.dart
           ! grep -q 'webview_windows' rustdesk/flutter/lib/desktop/pages/cabinet/cabinet_page.dart
+          # Cabinet entry must open native tab — never system browser fallback
+          ! grep -q 'LaunchMode.externalApplication' rustdesk/flutter/lib/desktop/pages/cabinet_webview_page.dart
+          ! grep -q 'launchUrl' rustdesk/flutter/lib/desktop/pages/cabinet_webview_page.dart
+          grep -q 'openDeskForceCabinet' rustdesk/flutter/lib/desktop/pages/desktop_home_page.dart
+          grep -q 'openDeskForceCabinet' rustdesk/flutter/lib/desktop/pages/deskforce_settings_page.dart
 
           test -f rustdesk/flutter/lib/desktop/pages/deskforce_settings_page.dart
           test -f rustdesk/flutter/lib/common/deskforce_startup.dart

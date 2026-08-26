@@ -592,7 +592,10 @@ def patch_about_dialog(src: pathlib.Path, app_name: str, api: str) -> None:
 
     about_links = f"""InkWell(
                   onTap: () {{
-                    launchUrlString('{base}/cabinet/?embed=1');
+                    openDeskForceCabinet(
+                      url: '{base}/cabinet/?embed=1',
+                      title: 'Личный кабинет',
+                    );
                   }},
                   child: Text(
                     'Личный кабинет',
@@ -600,7 +603,10 @@ def patch_about_dialog(src: pathlib.Path, app_name: str, api: str) -> None:
                   ).marginSymmetric(vertical: 4.0)),
               InkWell(
                   onTap: () {{
-                    launchUrlString('{base}/cabinet/billing?embed=1');
+                    openDeskForceCabinet(
+                      url: '{base}/cabinet/billing?embed=1',
+                      title: 'Тарифы',
+                    );
                   }},
                   child: Text(
                     'Тарифы и оплата',
@@ -692,6 +698,18 @@ def patch_about_dialog(src: pathlib.Path, app_name: str, api: str) -> None:
         text2 = re.sub(r"https?://(?:www\.)?rustdesk\.com[^\s'\"]*", f"{base}/", text2)
         print("Patched: stripped residual Purslane/rustdesk.com from About")
 
+    # Native cabinet opener — never launchUrlString for кабинет.
+    if "cabinet_webview_page.dart" not in text2:
+        text2 = (
+            "import 'package:flutter_hbb/desktop/pages/cabinet_webview_page.dart';\n"
+            + text2
+        )
+    # Strip any residual cabinet launchUrlString that fallback host-replace left behind.
+    text2 = re.sub(
+        r"launchUrlString\('https://[^']*/cabinet[^']*'\);",
+        "openDeskForceCabinet();",
+        text2,
+    )
     path.write_text(text2, encoding="utf-8")
     print("Patched: About dialog DeskForce-only")
 

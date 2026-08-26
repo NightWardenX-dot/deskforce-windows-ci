@@ -83,7 +83,12 @@ chmod +x generate-rdgen.sh
 - `https://deskforce.dr6ter.ru/downloads/update.json`
 - `https://deskforce.dr6ter.ru/api/client/update?platform=windows`
 
-Клиент (Windows Flutter OEM) при старте и из **Настройки → Обновления** сравнивает локальную версию (`OEM_APP_VERSION`, сейчас `1.2.0-beta.1`) с `platforms.<os>.version`. Если удалённая новее — диалог «Доступно обновление».
+Клиент (Windows Flutter OEM) при старте и из **Настройки → Обновления** сравнивает локальную версию (`OEM_APP_VERSION`, сейчас `1.2.0-beta.5`) с `platforms.<os>.version` по semver **включая** prerelease (`1.2.0-beta.3` < `1.2.0-beta.4` < `1.2.0-beta.5`). Если удалённая новее — баннер и диалог «Доступно обновление». API `GET /api/client/update?platform=windows&version=…` также возвращает `update_available`.
+
+> **Важно:** в `1.2.0-beta.3`/`beta.4` сравнение prerelease было сломано (все `1.2.0-beta.N` считались одинаковыми), поэтому автообновление до `beta.5` с них **не сработает** — скачайте `DeskForce.exe` вручную один раз с https://deskforce.dr6ter.ru/downloads/windows/DeskForce.exe
+
+> **Кабинет:** с `1.2.0-beta.5` кнопка «Личный кабинет» открывает **нативный** экран во вкладке приложения (не системный браузер). В `beta.3`/`beta.4` при сбое вкладки был fallback в браузер — из‑за этого кабинет мог открываться как сайт. Обновите клиент вручную один раз.
+
 
 Синхронизация статусов при публикации:
 

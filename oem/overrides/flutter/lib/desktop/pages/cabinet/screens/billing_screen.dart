@@ -83,21 +83,41 @@ class _CabinetBillingScreenState extends State<CabinetBillingScreen> {
       _msg = '';
     });
     try {
+      final api = CabinetApi.instance;
       final id = (plan['id'] ?? '').toString();
       final seats = _seats[id] ?? 1;
-      final order = await CabinetApi.instance.post('/billing/orders', body: {
+      final order = await api.post('/billing/orders', body: {
         'plan': id,
-        'seats': seats,
+        'seats': plan['price_per_seat'] == true ? seats : 0,
       });
-      final map = Map<String, dynamic>.from(order as Map);
+      var map = Map<String, dynamic>.from(order as Map);
+      if (map['status']?.toString() == 'paid') {
+        setState(() => _msg = plan['trial'] == true
+            ? 'Пробный период активирован'
+            : 'Лицензия активирована');
+        await _load();
+        return;
+      }
+      final provider = (_plansMeta?['provider'] ?? '').toString();
+      if (provider != 'manual' && map['id'] != null) {
+        try {
+          final paid = await api.post('/billing/orders/pay', body: {
+            'id': map['id'],
+            'method': 'card',
+          });
+          if (paid is Map) map = Map<String, dynamic>.from(paid);
+        } catch (_) {}
+      }
       final payUrl = (map['payment_url'] ?? '').toString();
       if (payUrl.isNotEmpty) {
         await launchUrl(Uri.parse(payUrl),
             mode: LaunchMode.externalApplication);
-        setState(() => _msg = 'Заказ #${map['id']} создан. Открыта оплата.');
+        setState(() =>
+            _msg = 'Заказ #${map['id']} создан. Открыта страница оплаты.');
       } else {
         setState(() => _msg =
-            'Заказ #${map['id']} создан (${map['amount_rub'] ?? ''} ₽). Следуйте инструкции оплаты.');
+            'Заказ #${map['id']} создан (${map['amount_rub'] ?? ''} ₽). '
+            'Оплатите по инструкции ниже или напишите в поддержку.');
       }
       await _load();
     } catch (e) {
