@@ -29,7 +29,7 @@ class OnlineStatusWidget extends StatefulWidget {
 }
 
 class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
-  final _svcStopped = Get.find<RxBool>(tag: 'stop-service');
+  late final RxBool _svcStopped;
   Timer? _updateTimer;
 
   static const _ink = Color(0xFFE8F4FF);
@@ -39,6 +39,11 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
   @override
   void initState() {
     super.initState();
+    try {
+      _svcStopped = Get.find<RxBool>(tag: 'stop-service');
+    } catch (_) {
+      _svcStopped = false.obs;
+    }
     _updateTimer = periodic_immediate(Duration(seconds: 1), () async {
       updateStatus();
     });

@@ -66,7 +66,9 @@ class DfCabinetSession extends GetxController {
 
   Future<void> refresh() async {
     if (!CabinetApi.instance.isLoggedIn) {
-      _clear();
+      // Soft clear only — never call mainClearAb / wipe access_token on cold start
+      // when the user simply is not in the cabinet (beta.13 reset-ab-on-boot).
+      _clearUiState();
       return;
     }
     loading.value = true;
@@ -252,9 +254,7 @@ class DfCabinetSession extends GetxController {
     }
   }
 
-  void _clear() {
-    // ignore: unawaited_futures
-    _syncRustdeskAbAuth(active: false);
+  void _clearUiState() {
     loggedIn.value = false;
     username.value = '';
     displayName.value = '';
@@ -273,5 +273,12 @@ class DfCabinetSession extends GetxController {
     devices.clear();
     lastError.value = '';
     loading.value = false;
+  }
+
+  void _clear() {
+    // Full logout: drop AB bridge + UI. Used by logout / 401 only.
+    // ignore: unawaited_futures
+    _syncRustdeskAbAuth(active: false);
+    _clearUiState();
   }
 }
