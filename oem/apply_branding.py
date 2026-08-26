@@ -1281,6 +1281,28 @@ def ensure_cabinet_sound_asset(src: pathlib.Path, root: pathlib.Path) -> None:
     print("WARN: missing flutter/assets/sounds/ui_click.wav — click sound disabled at runtime", file=sys.stderr)
 
 
+
+def ensure_crypto_dependency(src: pathlib.Path) -> None:
+    """cabinet_api PoW needs package:crypto (not always a direct dep upstream)."""
+    pubspec = src / "flutter" / "pubspec.yaml"
+    if not pubspec.is_file():
+        return
+    text = pubspec.read_text(encoding="utf-8", errors="ignore")
+    if re.search(r"^\s*crypto\s*:", text, flags=re.M):
+        print("OK: pubspec already has crypto")
+        return
+    m = re.search(r"(^dependencies:\s*\n)", text, flags=re.M)
+    if not m:
+        print("WARN: no dependencies block for crypto", file=sys.stderr)
+        return
+    insert_at = m.end()
+    hm = re.search(r"^(\s*http\s*:.*\n)", text, flags=re.M)
+    if hm:
+        insert_at = hm.end()
+    text2 = text[:insert_at] + "  crypto: ^3.0.3\n" + text[insert_at:]
+    pubspec.write_text(text2, encoding="utf-8")
+    print("Patched: pubspec crypto dependency")
+
 def patch_pubspec_cabinet_note(src: pathlib.Path) -> None:
     """Cabinet is native Flutter; webview_windows kept only if already required elsewhere."""
     # assets/ already covers assets/sounds/ — nothing required beyond copy_ui_overrides.
@@ -1627,6 +1649,7 @@ def main() -> int:
     patch_linux_packaging(src, app_name, api)
     patch_version(src, env("OEM_APP_VERSION", "1.0"))
     ensure_cabinet_sound_asset(src, root)
+    ensure_crypto_dependency(src)
     patch_pubspec_cabinet_note(src)
     patch_pubspec_webview(src)
     patch_peer_tabs(src)
