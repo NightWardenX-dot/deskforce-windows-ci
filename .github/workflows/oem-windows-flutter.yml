@@ -46,10 +46,10 @@ jobs:
           export OEM_APP_NAME OEM_APP_VERSION OEM_ID_SERVER OEM_RELAY_SERVER OEM_API_SERVER OEM_KEY_PUB
           RUSTDESK_SRC="$GITHUB_WORKSPACE/rustdesk" python3 deskforce/oem/apply_branding.py
           test -f rustdesk/flutter/assets/icon.png || cp -f deskforce/oem/branding/app_icon.png rustdesk/flutter/assets/icon.png
-          grep -n "B8892A\|DeskForce\|apply_deskforce_oem" \
+          grep -n "2DD4BF\|DeskForce\|apply_deskforce_oem" \
             rustdesk/flutter/lib/common.dart rustdesk/src/common.rs | head -20 || true
           # Fail if brand colors missing
-          grep -q "B8892A" rustdesk/flutter/lib/common.dart
+          grep -q "2DD4BF" rustdesk/flutter/lib/common.dart
           grep -q "apply_deskforce_oem" rustdesk/src/common.rs
           grep -q "DeskForce" rustdesk/libs/hbb_common/src/config.rs
           grep -q "Подключить устройство" rustdesk/flutter/lib/desktop/pages/connection_page.dart
@@ -116,8 +116,12 @@ jobs:
           if grep -q "RawAutocomplete<" rustdesk/flutter/lib/desktop/pages/connection_page.dart; then echo "desktop RawAutocomplete leak"; exit 1; fi
           if grep -q "PeerTabPage(" rustdesk/flutter/lib/desktop/pages/connection_page.dart; then echo "desktop PeerTabPage leak"; exit 1; fi
           if grep -q "Obx(() => InkWell" rustdesk/flutter/lib/desktop/pages/connection_page.dart; then echo "improper Obx InkWell (release gray ErrorWidget)"; exit 1; fi
-          grep -q "НЕДАВНИЕ" rustdesk/flutter/lib/desktop/pages/connection_page.dart
-          grep -q "0xFFE8E2D4" rustdesk/flutter/lib/desktop/pages/connection_page.dart
+          grep -q "DeskForcePeerLists" rustdesk/flutter/lib/desktop/pages/connection_page.dart
+          grep -q "НЕДАВНИЕ" rustdesk/flutter/lib/desktop/pages/deskforce_peer_lists.dart
+          grep -q "АДРЕСНАЯ КНИГА" rustdesk/flutter/lib/desktop/pages/deskforce_peer_lists.dart
+          grep -q "CabinetAddressBookScreen" rustdesk/flutter/lib/desktop/pages/cabinet/cabinet_page.dart
+          grep -q "_syncRustdeskAbAuth" rustdesk/flutter/lib/desktop/pages/cabinet/cabinet_session.dart
+          grep -q "0xFF2DD4BF" rustdesk/flutter/lib/desktop/pages/connection_page.dart
           grep -q "DeskForce mobile connect" rustdesk/flutter/lib/mobile/pages/connection_page.dart
           if grep -q "PeerTabPage(" rustdesk/flutter/lib/mobile/pages/connection_page.dart; then echo "mobile PeerTabPage leak"; exit 1; fi
           if grep -q "SliverFillRemaining" rustdesk/flutter/lib/mobile/pages/connection_page.dart; then echo "mobile SliverFillRemaining leak"; exit 1; fi
