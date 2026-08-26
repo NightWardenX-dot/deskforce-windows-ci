@@ -213,9 +213,13 @@ class _CabinetProfileScreenState extends State<CabinetProfileScreen> {
               ),
               const SizedBox(height: 10),
               TextField(
+                    style: DfCabinetTheme.inputStyle,
+                    cursorColor: DfCabinetTheme.brass,
                   controller: _name, decoration: DfCabinetTheme.field('Имя')),
               const SizedBox(height: 10),
               TextField(
+                    style: DfCabinetTheme.inputStyle,
+                    cursorColor: DfCabinetTheme.brass,
                   controller: _email,
                   decoration: DfCabinetTheme.field('Email'),
                   keyboardType: TextInputType.emailAddress),
@@ -241,11 +245,15 @@ class _CabinetProfileScreenState extends State<CabinetProfileScreen> {
                       color: DfCabinetTheme.ink)),
               const SizedBox(height: 10),
               TextField(
+                    style: DfCabinetTheme.inputStyle,
+                    cursorColor: DfCabinetTheme.brass,
                   controller: _oldPwd,
                   obscureText: true,
                   decoration: DfCabinetTheme.field('Текущий пароль')),
               const SizedBox(height: 10),
               TextField(
+                    style: DfCabinetTheme.inputStyle,
+                    cursorColor: DfCabinetTheme.brass,
                   controller: _newPwd,
                   obscureText: true,
                   decoration: DfCabinetTheme.field('Новый пароль')),
@@ -295,6 +303,8 @@ class _CabinetProfileScreenState extends State<CabinetProfileScreen> {
                   ],
                   const SizedBox(height: 10),
                   TextField(
+                    style: DfCabinetTheme.inputStyle,
+                    cursorColor: DfCabinetTheme.brass,
                       controller: _tfaCode,
                       decoration: DfCabinetTheme.field('Код из приложения'),
                       keyboardType: TextInputType.number),
@@ -308,11 +318,15 @@ class _CabinetProfileScreenState extends State<CabinetProfileScreen> {
                 ],
               ] else ...[
                 TextField(
+                    style: DfCabinetTheme.inputStyle,
+                    cursorColor: DfCabinetTheme.brass,
                     controller: _disablePwd,
                     obscureText: true,
                     decoration: DfCabinetTheme.field('Пароль')),
                 const SizedBox(height: 10),
                 TextField(
+                    style: DfCabinetTheme.inputStyle,
+                    cursorColor: DfCabinetTheme.brass,
                     controller: _disableCode,
                     decoration: DfCabinetTheme.field('Код 2FA'),
                     keyboardType: TextInputType.number),

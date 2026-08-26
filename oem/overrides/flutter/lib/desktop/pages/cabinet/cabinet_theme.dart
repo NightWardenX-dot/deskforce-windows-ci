@@ -12,10 +12,41 @@ class DfCabinetTheme {
   static const danger = Color(0xFFF87171);
   static const ok = Color(0xFF34D399);
 
+  /// Readable field text on dark slate panels (app ThemeMode.light otherwise paints dark glyphs).
+  static const inputStyle = TextStyle(color: ink, fontSize: 15.5, height: 1.3);
+  static const hintStyle = TextStyle(color: Color(0x99E8F4FF), fontSize: 15);
+
+  static ThemeData darkTheme() => ThemeData(
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: paper,
+        canvasColor: paper,
+        cardColor: card,
+        primaryColor: brass,
+        colorScheme: const ColorScheme.dark(
+          primary: brass,
+          secondary: brassDeep,
+          surface: paper,
+          onSurface: ink,
+          onPrimary: Color(0xFF041016),
+        ),
+        textTheme: const TextTheme(
+          bodyLarge: inputStyle,
+          bodyMedium: inputStyle,
+          titleMedium: inputStyle,
+        ),
+        textSelectionTheme: TextSelectionThemeData(
+          cursorColor: brass,
+          selectionColor: Color(0x662DD4BF),
+          selectionHandleColor: brass,
+        ),
+      );
+
   static InputDecoration field(String label, {String? hint}) => InputDecoration(
         labelText: label,
         hintText: hint,
         labelStyle: TextStyle(color: ink.withOpacity(0.65)),
+        hintStyle: hintStyle,
+        floatingLabelStyle: TextStyle(color: brass),
         filled: true,
         fillColor: const Color(0xEE111827),
         border: OutlineInputBorder(

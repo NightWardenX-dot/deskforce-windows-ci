@@ -295,6 +295,8 @@ class _CabinetAuthScreenState extends State<CabinetAuthScreen> {
                     _mode == _AuthMode.register ||
                     _mode == _AuthMode.forgot)
                   TextField(
+                    style: DfCabinetTheme.inputStyle,
+                    cursorColor: DfCabinetTheme.brass,
                     controller: _user,
                     decoration: DfCabinetTheme.field(
                         _mode == _AuthMode.forgot ? 'Логин или email' : 'Логин'),
@@ -303,11 +305,15 @@ class _CabinetAuthScreenState extends State<CabinetAuthScreen> {
                 if (_mode == _AuthMode.register) ...[
                   const SizedBox(height: 10),
                   TextField(
+                    style: DfCabinetTheme.inputStyle,
+                    cursorColor: DfCabinetTheme.brass,
                     controller: _name,
                     decoration: DfCabinetTheme.field('Имя'),
                   ),
                   const SizedBox(height: 10),
                   TextField(
+                    style: DfCabinetTheme.inputStyle,
+                    cursorColor: DfCabinetTheme.brass,
                     controller: _email,
                     decoration: DfCabinetTheme.field('Email'),
                     keyboardType: TextInputType.emailAddress,
@@ -316,6 +322,8 @@ class _CabinetAuthScreenState extends State<CabinetAuthScreen> {
                 if (_mode == _AuthMode.login || _mode == _AuthMode.register) ...[
                   const SizedBox(height: 10),
                   TextField(
+                    style: DfCabinetTheme.inputStyle,
+                    cursorColor: DfCabinetTheme.brass,
                     controller: _pass,
                     obscureText: true,
                     decoration: DfCabinetTheme.field('Пароль'),
@@ -324,6 +332,8 @@ class _CabinetAuthScreenState extends State<CabinetAuthScreen> {
                 ],
                 if (_mode == _AuthMode.verify) ...[
                   TextField(
+                    style: DfCabinetTheme.inputStyle,
+                    cursorColor: DfCabinetTheme.brass,
                     controller: _verify,
                     decoration: DfCabinetTheme.field('Код из письма'),
                   ),
@@ -331,6 +341,8 @@ class _CabinetAuthScreenState extends State<CabinetAuthScreen> {
                 if (_needTfa && _mode == _AuthMode.login) ...[
                   const SizedBox(height: 10),
                   TextField(
+                    style: DfCabinetTheme.inputStyle,
+                    cursorColor: DfCabinetTheme.brass,
                     controller: _tfa,
                     decoration: DfCabinetTheme.field('Код 2FA'),
                     keyboardType: TextInputType.number,
@@ -416,6 +428,8 @@ class _CabinetAuthScreenState extends State<CabinetAuthScreen> {
                   child: SizedBox(
                     height: 0,
                     child: TextField(
+                    style: DfCabinetTheme.inputStyle,
+                    cursorColor: DfCabinetTheme.brass,
                       decoration: const InputDecoration(hintText: 'company'),
                       enabled: false,
                     ),

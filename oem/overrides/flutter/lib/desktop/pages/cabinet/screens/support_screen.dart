@@ -261,6 +261,8 @@ class _CabinetSupportScreenState extends State<CabinetSupportScreen> {
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: TextField(
+                    style: DfCabinetTheme.inputStyle,
+                    cursorColor: DfCabinetTheme.brass,
                     controller: _subject,
                     decoration: DfCabinetTheme.field('Тема (необязательно)'),
                   ),
@@ -269,6 +271,8 @@ class _CabinetSupportScreenState extends State<CabinetSupportScreen> {
                 children: [
                   Expanded(
                     child: TextField(
+                    style: DfCabinetTheme.inputStyle,
+                    cursorColor: DfCabinetTheme.brass,
                       controller: _body,
                       minLines: 1,
                       maxLines: 4,

@@ -115,38 +115,41 @@ class _DeskForceCabinetPageState extends State<DeskForceCabinetPage> {
         }
       });
     }
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFF070B14),
-            Color(0xFF0C1422),
-            Color(0xFF070B14),
+    return Theme(
+      data: DfCabinetTheme.darkTheme(),
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFF070B14),
+              Color(0xFF0C1422),
+              Color(0xFF070B14),
+            ],
+          ),
+        ),
+        child: Column(
+          children: [
+            _topBar(),
+            Expanded(
+              child: !_loggedIn
+                  ? CabinetAuthScreen(
+                      onLoggedIn: () {
+                        setState(() => _loggedIn = true);
+                        DfCabinetSession.to.refresh();
+                      },
+                    )
+                  : Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _sideNav(),
+                        Expanded(child: _body()),
+                      ],
+                    ),
+            ),
           ],
         ),
-      ),
-      child: Column(
-        children: [
-          _topBar(),
-          Expanded(
-            child: !_loggedIn
-                ? CabinetAuthScreen(
-                    onLoggedIn: () {
-                      setState(() => _loggedIn = true);
-                      DfCabinetSession.to.refresh();
-                    },
-                  )
-                : Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _sideNav(),
-                      Expanded(child: _body()),
-                    ],
-                  ),
-          ),
-        ],
       ),
     );
   }
