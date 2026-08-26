@@ -1,0 +1,241 @@
+name: DeskForce macOS Flutter (unsigned)
+
+# Branded unsigned .dmg / .app zip from RustDesk upstream + oem/apply_branding.py.
+# Signing and Apple notarization are NOT included — Gatekeeper will warn on first open.
+# Users: right-click → Open, or xattr -cr /Applications/DeskForce.app
+on:
+  workflow_dispatch:
+
+env:
+  # cidre (macOS) needs Rust >= 1.81 (upstream MAC_RUST_VERSION)
+  RUST_VERSION: "1.81"
+  FLUTTER_VERSION: "3.24.5"
+  VCPKG_COMMIT_ID: "120deac3062162151622ca4860575a33844ba10b"
+  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+  OEM_APP_NAME: DeskForce
+  OEM_APP_VERSION: "1.2.0-beta.4"
+  OEM_ID_SERVER: "78.29.49.98"
+  OEM_RELAY_SERVER: "78.29.49.98"
+  OEM_API_SERVER: "https://deskforce.dr6ter.ru"
+  OEM_KEY_PUB: "ERushCbh73QS5YNPuOvqK5M3Yx9v9z+8Ft5O+iAQevg="
+  RUSTDESK_TAG: "1.4.6"
+  # Apple Silicon runner (macos-14). Intel: use macos-13 + x86_64-apple-darwin / x64-osx.
+  MAC_TARGET: "aarch64-apple-darwin"
+  MAC_ARCH: "aarch64"
+  VCPKG_TRIPLET: "arm64-osx"
+
+jobs:
+  build-macos:
+    runs-on: macos-14
+    timeout-minutes: 240
+    steps:
+      - name: Export GitHub Actions cache environment variables
+        uses: actions/github-script@v6
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - name: Checkout DeskForce (OEM branding)
+        uses: actions/checkout@v4
+        with:
+          path: deskforce
+
+      - name: Clone RustDesk ${{ env.RUSTDESK_TAG }}
+        run: |
+          git clone --depth 1 --branch "${{ env.RUSTDESK_TAG }}" \
+            https://github.com/rustdesk/rustdesk.git rustdesk
+          cd rustdesk
+          git submodule update --init --recursive --depth 1 || git submodule update --init --recursive
+
+      - name: Apply DeskForce branding
+        env:
+          PYTHONUTF8: "1"
+          PYTHONIOENCODING: utf-8
+        run: |
+          export RUSTDESK_SRC="$GITHUB_WORKSPACE/rustdesk"
+          export OEM_APP_NAME OEM_APP_VERSION OEM_ID_SERVER OEM_RELAY_SERVER OEM_API_SERVER OEM_KEY_PUB
+          python3 deskforce/oem/apply_branding.py
+          test -f rustdesk/flutter/assets/icon.png || cp -f deskforce/oem/branding/app_icon.png rustdesk/flutter/assets/icon.png
+          # Optional macOS icns from PNG if branding has no .icns yet
+          if [[ ! -f deskforce/oem/branding/app_icon.icns ]]; then
+            mkdir -p /tmp/DeskForce.iconset
+            SRC_PNG=deskforce/oem/branding/app_icon.png
+            sips -z 16 16     "$SRC_PNG" --out /tmp/DeskForce.iconset/icon_16x16.png || true
+            sips -z 32 32     "$SRC_PNG" --out /tmp/DeskForce.iconset/icon_16x16@2x.png || true
+            sips -z 32 32     "$SRC_PNG" --out /tmp/DeskForce.iconset/icon_32x32.png || true
+            sips -z 64 64     "$SRC_PNG" --out /tmp/DeskForce.iconset/icon_32x32@2x.png || true
+            sips -z 128 128   "$SRC_PNG" --out /tmp/DeskForce.iconset/icon_128x128.png || true
+            sips -z 256 256   "$SRC_PNG" --out /tmp/DeskForce.iconset/icon_128x128@2x.png || true
+            sips -z 256 256   "$SRC_PNG" --out /tmp/DeskForce.iconset/icon_256x256.png || true
+            sips -z 512 512   "$SRC_PNG" --out /tmp/DeskForce.iconset/icon_256x256@2x.png || true
+            sips -z 512 512   "$SRC_PNG" --out /tmp/DeskForce.iconset/icon_512x512.png || true
+            sips -z 1024 1024 "$SRC_PNG" --out /tmp/DeskForce.iconset/icon_512x512@2x.png || true
+            iconutil -c icns /tmp/DeskForce.iconset -o /tmp/app_icon.icns || true
+            if [[ -f /tmp/app_icon.icns ]]; then
+              cp -f /tmp/app_icon.icns rustdesk/res/mac-icon.icns
+              cp -f /tmp/app_icon.icns rustdesk/res/icon.icns || true
+            fi
+          fi
+          grep -q "DeskForce" rustdesk/libs/hbb_common/src/config.rs
+          grep -q "78.29.49.98" rustdesk/libs/hbb_common/src/config.rs
+          ! grep -q "rs-ny.rustdesk.com" rustdesk/libs/hbb_common/src/config.rs
+          grep -q 'version = "1.2.0-beta.4"' rustdesk/Cargo.toml
+          grep -q "B8892A" rustdesk/flutter/lib/common.dart
+
+      - name: Install build runtime
+        run: |
+          brew install llvm create-dmg
+          if command -v pkg-config &>/dev/null; then
+            echo "pkg-config already installed"
+          else
+            brew install pkg-config
+          fi
+          # NASM 2.16.x only — brew NASM 3.x breaks aom / multimedia (upstream RustDesk CI)
+          wget -q https://www.nasm.us/pub/nasm/releasebuilds/2.16.03/macosx/nasm-2.16.03-macosx.zip
+          unzip -qo nasm-2.16.03-macosx.zip
+          sudo cp nasm-2.16.03/nasm /usr/local/bin/nasm
+          nasm --version
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          targets: ${{ env.MAC_TARGET }}
+          components: rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rustdesk -> target
+          prefix-key: deskforce-macos-${{ env.MAC_ARCH }}
+
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
+          doNotCache: false
+
+      - name: Install vcpkg dependencies
+        working-directory: rustdesk
+        run: |
+          if ! $VCPKG_ROOT/vcpkg install --x-install-root="$VCPKG_ROOT/installed"; then
+            find "${VCPKG_ROOT}/" -name "*.log" | while read -r f; do
+              echo "==== $f ===="; head -n 80 "$f" || true
+            done
+            exit 1
+          fi
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Patch Flutter + enable macOS desktop
+        run: |
+          FLUTTER_ROOT="$(dirname "$(dirname "$(which flutter)")")"
+          cp deskforce/.github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff "$FLUTTER_ROOT/"
+          cd "$FLUTTER_ROOT"
+          git apply flutter_3.24.4_dropdown_menu_enableFilter.diff || true
+          # https://github.com/flutter/flutter/issues/133533 (upstream macOS workaround)
+          sed -i '' -e 's/_setFramesEnabledState(false);/\/\/_setFramesEnabledState(false);/g' \
+            packages/flutter/lib/src/scheduler/binding.dart || true
+          flutter config --enable-macos-desktop
+          flutter doctor -v
+
+      - name: Install flutter_rust_bridge
+        run: |
+          cargo install cargo-expand --locked || true
+          cargo install flutter_rust_bridge_codegen --version 1.80.1 --features "uuid" --locked \
+            || cargo install flutter_rust_bridge_codegen --features "uuid" --locked
+
+      - name: Generate FFI bridge
+        working-directory: rustdesk
+        run: |
+          pushd flutter
+          flutter pub get
+          popd
+          flutter_rust_bridge_codegen \
+            --rust-input ./src/flutter_ffi.rs \
+            --dart-output ./flutter/lib/generated_bridge.dart \
+            --c-output ./flutter/macos/Runner/bridge_generated.h
+          mkdir -p flutter/ios/Runner
+          cp -f flutter/macos/Runner/bridge_generated.h flutter/ios/Runner/bridge_generated.h || true
+          test -f flutter/lib/generated_bridge.dart
+          test -f src/bridge_generated.rs
+
+      - name: Build DeskForce macOS (unsigned)
+        working-directory: rustdesk
+        run: |
+          set -e
+          # Apple Silicon deployment target (ScreenCaptureKit)
+          MIN_MACOS_VERSION="12.3"
+          sed -i '' -e "s/MACOSX_DEPLOYMENT_TARGET=[0-9]*\.[0-9]*/MACOSX_DEPLOYMENT_TARGET=${MIN_MACOS_VERSION}/" build.py || true
+          sed -i '' -e "s/platform :osx, '.*'/platform :osx, '${MIN_MACOS_VERSION}'/" flutter/macos/Podfile || true
+          sed -i '' -e "s/osx_minimum_system_version = \"[0-9]*\.[0-9]*\"/osx_minimum_system_version = \"${MIN_MACOS_VERSION}\"/" Cargo.toml || true
+          sed -i '' -e "s/MACOSX_DEPLOYMENT_TARGET = [0-9]*\.[0-9]*;/MACOSX_DEPLOYMENT_TARGET = ${MIN_MACOS_VERSION};/" \
+            flutter/macos/Runner.xcodeproj/project.pbxproj || true
+          python3 ./build.py --flutter --hwcodec --unix-file-copy-paste --screencapturekit
+
+      - name: Package unsigned .dmg + .zip
+        working-directory: rustdesk
+        run: |
+          set -e
+          APP_SRC="flutter/build/macos/Build/Products/Release/RustDesk.app"
+          if [[ ! -d "$APP_SRC" ]]; then
+            APP_SRC=$(find flutter/build/macos -name '*.app' -type d | head -n1 || true)
+          fi
+          test -n "$APP_SRC" && test -d "$APP_SRC"
+          echo "Found app: $APP_SRC"
+          mkdir -p ../out /tmp/dmg-stage
+          rm -rf /tmp/dmg-stage/DeskForce.app
+          cp -a "$APP_SRC" /tmp/dmg-stage/DeskForce.app
+          # Prefer create-dmg (preserves app bundle structure better than tar for later codesign)
+          CREATE_DMG="$(command -v create-dmg)"
+          CREATE_DMG="$(readlink "$CREATE_DMG" || echo "$CREATE_DMG")"
+          if [[ -f "$CREATE_DMG" ]]; then
+            sed -i '' -e 's/MAXIMUM_UNMOUNTING_ATTEMPTS=3/MAXIMUM_UNMOUNTING_ATTEMPTS=7/' "$CREATE_DMG" || true
+          fi
+          rm -f ../out/DeskForce.dmg ../out/DeskForce-macOS.zip
+          create-dmg \
+            --volname "DeskForce" \
+            --icon "DeskForce.app" 200 190 \
+            --hide-extension "DeskForce.app" \
+            --window-size 800 400 \
+            --app-drop-link 600 185 \
+            ../out/DeskForce.dmg \
+            /tmp/dmg-stage/DeskForce.app \
+            || {
+              echo "create-dmg failed; falling back to hdiutil"
+              hdiutil create -volname DeskForce -srcfolder /tmp/dmg-stage -ov -format UDZO ../out/DeskForce.dmg
+            }
+          # ZIP of .app (Gatekeeper-friendly alternative download)
+          ditto -c -k --sequesterRsrc --keepParent /tmp/dmg-stage/DeskForce.app ../out/DeskForce-macOS.zip
+          ls -lh ../out/
+          SIZE=$(wc -c < ../out/DeskForce.dmg)
+          echo "DeskForce.dmg bytes=$SIZE"
+          test "$SIZE" -gt 5000000
+          # Explicit: no Apple signing / notarization in this workflow
+          cat > ../out/UNSIGNED_README.txt <<'EOF'
+          DeskForce macOS — UNSIGNED build
+          ================================
+          This artifact is NOT code-signed and NOT notarized by Apple.
+
+          First launch on macOS:
+            1. Open DeskForce.dmg and drag DeskForce.app to Applications
+            2. Right-click DeskForce.app → Open → confirm
+            or: xattr -cr /Applications/DeskForce.app && open /Applications/DeskForce.app
+
+          Apple Developer ID + notarization can be added later via CI secrets
+          (MACOS_P12_BASE64 / MACOS_CODESIGN_IDENTITY / notarize JSON) — not required for this pipeline.
+          EOF
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DeskForce-macOS
+          path: |
+            out/DeskForce.dmg
+            out/DeskForce-macOS.zip
+            out/UNSIGNED_README.txt
+          if-no-files-found: error
