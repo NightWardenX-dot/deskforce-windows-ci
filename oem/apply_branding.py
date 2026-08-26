@@ -1247,6 +1247,34 @@ def patch_version(src: pathlib.Path, version: str = "1.0") -> None:
     patch_portable_packer_version(src, semver)
 
 
+
+def ensure_cabinet_sound_asset(src: pathlib.Path, root: pathlib.Path) -> None:
+    """Ensure DeskForce UI click wav is present under flutter/assets/sounds (copied via overrides)."""
+    wav = src / "flutter" / "assets" / "sounds" / "ui_click.wav"
+    if wav.is_file() and wav.stat().st_size > 100:
+        print(f"OK: cabinet click sound {wav.relative_to(src)}")
+        return
+    ov = root / "overrides" / "flutter" / "assets" / "sounds" / "ui_click.wav"
+    if ov.is_file():
+        wav.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ov, wav)
+        print(f"Copied: {wav.relative_to(src)}")
+        return
+    print("WARN: missing flutter/assets/sounds/ui_click.wav — click sound disabled at runtime", file=sys.stderr)
+
+
+def patch_pubspec_cabinet_note(src: pathlib.Path) -> None:
+    """Cabinet is native Flutter; webview_windows kept only if already required elsewhere."""
+    # assets/ already covers assets/sounds/ — nothing required beyond copy_ui_overrides.
+    pubspec = src / "flutter" / "pubspec.yaml"
+    if not pubspec.is_file():
+        return
+    text = pubspec.read_text(encoding="utf-8", errors="ignore")
+    if "assets/sounds/" in text or "- assets/" in text:
+        print("OK: pubspec assets/ covers sounds/")
+    # Leave webview_windows if present (CI may still grep); native cabinet does not import it.
+
+
 def patch_pubspec_webview(src: pathlib.Path) -> None:
     pubspec = src / "flutter" / "pubspec.yaml"
     if not pubspec.is_file():
@@ -1580,6 +1608,8 @@ def main() -> int:
     patch_disable_stock_update_check(src)
     patch_linux_packaging(src, app_name, api)
     patch_version(src, env("OEM_APP_VERSION", "1.0"))
+    ensure_cabinet_sound_asset(src, root)
+    patch_pubspec_cabinet_note(src)
     patch_pubspec_webview(src)
     patch_peer_tabs(src)
     patch_home_cabinet_links(src, api)

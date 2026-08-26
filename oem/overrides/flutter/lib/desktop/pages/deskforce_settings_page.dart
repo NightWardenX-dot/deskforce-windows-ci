@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/common/deskforce_startup.dart';
 import 'package:flutter_hbb/common/deskforce_update.dart';
+import 'package:flutter_hbb/desktop/pages/cabinet/click_sound.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet_webview_page.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -25,6 +26,7 @@ class _DeskForceSettingsPageState extends State<DeskForceSettingsPage> {
   bool _autostart = false;
   bool _startTray = false;
   bool _startFs = true; // default ON
+  bool _clickSound = false; // default OFF
   bool _busy = false;
 
   @override
@@ -39,6 +41,7 @@ class _DeskForceSettingsPageState extends State<DeskForceSettingsPage> {
       _autostart = auto || dfLocalBool(kDfAutostart);
       _startTray = dfLocalBool(kDfStartInTray);
       _startFs = dfLocalBoolDefaultOn(kDfStartFullscreen);
+      _clickSound = dfClickSoundEnabled();
     });
   }
 
@@ -109,6 +112,17 @@ class _DeskForceSettingsPageState extends State<DeskForceSettingsPage> {
                   _startFs = v;
                   if (v) _startTray = false;
                 });
+              },
+            ),
+            _toggle(
+              title: 'Звук нажатий',
+              subtitle:
+                  'Короткий щелчок при нажатии основных кнопок (по умолчанию выключено)',
+              value: _clickSound,
+              onChanged: (v) async {
+                await dfSetClickSoundEnabled(v);
+                setState(() => _clickSound = v);
+                if (v) await dfPlayClickSound();
               },
             ),
             const Divider(height: 24),
