@@ -9,15 +9,23 @@ import 'package:flutter_hbb/desktop/pages/cabinet/screens/devices_screen.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet/screens/overview_screen.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet/screens/profile_screen.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet/screens/support_screen.dart';
+import 'package:flutter_hbb/desktop/pages/cabinet/screens/updates_screen.dart';
+import 'package:flutter_hbb/desktop/pages/cabinet/screens/news_screen.dart';
+import 'package:flutter_hbb/desktop/pages/cabinet/screens/chat_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-enum CabinetSection { overview, devices, billing, support, profile }
+enum CabinetSection { overview, devices, chat, news, updates, billing, support, profile }
 
 CabinetSection cabinetSectionFromUrl(String url) {
   final u = url.toLowerCase();
   if (u.contains('/billing')) return CabinetSection.billing;
   if (u.contains('/support')) return CabinetSection.support;
   if (u.contains('/devices')) return CabinetSection.devices;
+  if (u.contains('/chat')) return CabinetSection.chat;
+  if (u.contains('/news')) return CabinetSection.news;
+  if (u.contains('/updates') || u.contains('/changelog')) {
+    return CabinetSection.updates;
+  }
   if (u.contains('/profile') || u.contains('/account')) {
     return CabinetSection.profile;
   }
@@ -66,6 +74,15 @@ class _DeskForceCabinetPageState extends State<DeskForceCabinetPage> {
       case 'devices':
         _go(CabinetSection.devices);
         break;
+      case 'chat':
+        _go(CabinetSection.chat);
+        break;
+      case 'news':
+        _go(CabinetSection.news);
+        break;
+      case 'updates':
+        _go(CabinetSection.updates);
+        break;
       case 'billing':
         _go(CabinetSection.billing);
         break;
@@ -94,6 +111,12 @@ class _DeskForceCabinetPageState extends State<DeskForceCabinetPage> {
         return widget.title;
       case CabinetSection.devices:
         return 'Устройства';
+      case CabinetSection.chat:
+        return 'Чат';
+      case CabinetSection.news:
+        return 'Новости';
+      case CabinetSection.updates:
+        return 'Обновления';
       case CabinetSection.billing:
         return 'Тарифы';
       case CabinetSection.support:
@@ -212,6 +235,21 @@ class _DeskForceCabinetPageState extends State<DeskForceCabinetPage> {
         'label': 'Устройства',
       },
       {
+        'section': CabinetSection.chat,
+        'icon': Icons.chat_bubble_outline,
+        'label': 'Чат',
+      },
+      {
+        'section': CabinetSection.news,
+        'icon': Icons.campaign_outlined,
+        'label': 'Новости',
+      },
+      {
+        'section': CabinetSection.updates,
+        'icon': Icons.system_update_alt,
+        'label': 'Обновления',
+      },
+      {
         'section': CabinetSection.billing,
         'icon': Icons.payments_outlined,
         'label': 'Тарифы',
@@ -293,6 +331,12 @@ class _DeskForceCabinetPageState extends State<DeskForceCabinetPage> {
         return CabinetOverviewScreen(onNavigate: _goNamed);
       case CabinetSection.devices:
         return const CabinetDevicesScreen();
+      case CabinetSection.chat:
+        return const CabinetChatScreen();
+      case CabinetSection.news:
+        return const CabinetNewsScreen();
+      case CabinetSection.updates:
+        return const CabinetUpdatesScreen();
       case CabinetSection.billing:
         return const CabinetBillingScreen();
       case CabinetSection.support:

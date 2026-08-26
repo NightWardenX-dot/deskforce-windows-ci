@@ -172,6 +172,9 @@ class _CabinetOverviewScreenState extends State<CabinetOverviewScreen> {
                 const SizedBox(height: 10),
                 Wrap(spacing: 10, runSpacing: 8, children: [
                   _navBtn('Устройства', 'devices'),
+                  _navBtn('Чат', 'chat'),
+                  _navBtn('Новости', 'news'),
+                  _navBtn('Обновления', 'updates'),
                   _navBtn('Поддержка', 'support'),
                   _navBtn('Профиль', 'profile'),
                 ]),
