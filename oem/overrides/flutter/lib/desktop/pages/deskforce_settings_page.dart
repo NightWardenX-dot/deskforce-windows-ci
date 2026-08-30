@@ -31,6 +31,8 @@ class _DeskForceSettingsPageState extends State<DeskForceSettingsPage> {
   bool _clickSound = false; // default OFF
   bool _hideOnLan = false; // Deny LAN discovery → enable-lan-discovery = N
   bool _busy = false;
+  bool _testBuilds = false;
+  String _updateChannel = 'release';
 
   @override
   void initState() {
@@ -42,8 +44,12 @@ class _DeskForceSettingsPageState extends State<DeskForceSettingsPage> {
     final auto = await dfIsWindowsAutostartEnabled();
     // "Deny LAN discovery" in stock UI: reverse of enable-lan-discovery
     final lanEnabled = mainGetBoolOptionSync(kOptionEnableLanDiscovery);
+    final testBuilds = await dfTestBuildsEnabled();
+    final channel = await dfGetUpdateChannel();
     setState(() {
       _autostart = auto || dfLocalBool(kDfAutostart);
+      _testBuilds = testBuilds;
+      _updateChannel = channel;
       _startTray = dfLocalBool(kDfStartInTray);
       _startFs = dfLocalBoolDefaultOff(kDfStartFullscreen);
       _clickSound = dfClickSoundEnabled();
@@ -170,6 +176,55 @@ class _DeskForceSettingsPageState extends State<DeskForceSettingsPage> {
           _sectionTitle('Обновления'),
           const SizedBox(height: 12),
           _cardBox(children: [
+            _toggle(
+              title: 'Тестовые сборки',
+              subtitle:
+                  'Показать выбор канала обновлений (альфа / бета / релиз). По умолчанию — только релиз.',
+              value: _testBuilds,
+              onChanged: (v) async {
+                await dfSetTestBuildsEnabled(v);
+                setState(() {
+                  _testBuilds = v;
+                  if (!v) _updateChannel = 'release';
+                });
+              },
+            ),
+
+          if (_testBuilds) ...[
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                'Канал: ${dfUpdateChannelLabel(_updateChannel)}',
+                style: TextStyle(color: _ink.withOpacity(0.7), fontSize: 14),
+              ),
+            ),
+            ...kDfUpdateChannels.map((ch) => RadioListTile<String>(
+                  contentPadding: EdgeInsets.zero,
+                  activeColor: _brass,
+                  title: Text(dfUpdateChannelLabel(ch),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700, fontSize: 16, color: _ink)),
+                  subtitle: Text(
+                    ch == 'release'
+                        ? 'Стабильные сборки для всех пользователей'
+                        : ch == 'beta'
+                            ? 'Предрелизные сборки для тестирования'
+                            : 'Экспериментальные сборки — может быть нестабильно',
+                    style: TextStyle(fontSize: 13, color: _ink.withOpacity(0.55)),
+                  ),
+                  value: ch,
+                  groupValue: _updateChannel,
+                  onChanged: _busy
+                      ? null
+                      : (v) async {
+                          if (v == null) return;
+                          await dfSetUpdateChannel(v);
+                          setState(() => _updateChannel = v);
+                        },
+                )),
+          ],
+
             ListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('Проверить обновления',

@@ -12,6 +12,11 @@ class DfCabinetTheme {
   static const danger = Color(0xFFF87171);
   static const ok = Color(0xFF34D399);
 
+  /// Cream panel on dark canvas — dark ink for readable contrast.
+  static const lightSurface = Color(0xFFFBF8F1);
+  static const inkOnLight = Color(0xFF1A2332);
+  static const inkMutedOnLight = Color(0xFF4A5568);
+
   /// Readable field text on dark slate panels (app ThemeMode.light otherwise paints dark glyphs).
   static const inputStyle = TextStyle(color: ink, fontSize: 15.5, height: 1.3);
   static const hintStyle = TextStyle(color: Color(0x99E8F4FF), fontSize: 15);
@@ -93,6 +98,28 @@ class DfCabinetTheme {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       );
+
+  static Widget lightPanel({required Widget child, EdgeInsetsGeometry? padding}) {
+    return Container(
+      width: double.infinity,
+      padding: padding ?? const EdgeInsets.fromLTRB(18, 16, 18, 16),
+      decoration: BoxDecoration(
+        color: lightSurface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0x55B8892A)),
+        boxShadow: const [
+          BoxShadow(color: Color(0x12000000), blurRadius: 8, offset: Offset(0, 2)),
+        ],
+      ),
+      child: DefaultTextStyle(
+        style: const TextStyle(color: inkOnLight, fontSize: 15, height: 1.35),
+        child: IconTheme(
+          data: const IconThemeData(color: brassDeep),
+          child: child,
+        ),
+      ),
+    );
+  }
 
   static Widget panel({required Widget child, EdgeInsetsGeometry? padding}) {
     return Container(

@@ -37,6 +37,7 @@ class DfCabinetSession extends GetxController {
   final onlineDevices = 0.obs;
   final openTickets = 0.obs;
   final licensedDevices = 0.obs;
+  final chatCallsEnabled = false.obs;
   final localIdLinked = false.obs;
   final localDeviceId = ''.obs;
   final devices = <Map<String, dynamic>>[].obs;
@@ -127,6 +128,7 @@ class DfCabinetSession extends GetxController {
       licensedDevices.value = (me['licensed_devices'] is num)
           ? (me['licensed_devices'] as num).toInt()
           : 0;
+      chatCallsEnabled.value = me['chat_calls_enabled'] == true;
       if (lic != null) {
         licenseActive.value = lic['active'] == true;
         plan.value = (lic['plan'] ?? '').toString();
@@ -268,6 +270,7 @@ class DfCabinetSession extends GetxController {
     onlineDevices.value = 0;
     openTickets.value = 0;
     licensedDevices.value = 0;
+    chatCallsEnabled.value = false;
     localIdLinked.value = false;
     localDeviceId.value = '';
     devices.clear();

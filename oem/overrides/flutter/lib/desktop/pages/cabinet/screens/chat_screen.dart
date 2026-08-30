@@ -5,6 +5,9 @@ import 'package:flutter_hbb/desktop/pages/cabinet/cabinet_errors.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet/cabinet_theme.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet/click_sound.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
+import 'package:flutter_hbb/desktop/pages/cabinet/cabinet_session.dart';
+import 'package:flutter_hbb/desktop/pages/cabinet_webview_page.dart';
+import 'package:get/get.dart';
 
 /// Peer entry for cabinet chat hub (devices + recent + address book).
 class _ChatPeer {
@@ -188,8 +191,74 @@ class _CabinetChatScreenState extends State<CabinetChatScreen> {
     }
   }
 
+  Widget _upgradePrompt() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: DfCabinetTheme.lightPanel(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Чат и голосовые вызовы',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: DfCabinetTheme.inkOnLight,
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'Доступны на платных тарифах DeskForce. Оформите подписку в кабинете — удалённый доступ останется доступен.',
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.45,
+                  color: DfCabinetTheme.inkMutedOnLight,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                style: DfCabinetTheme.primaryButton(),
+                onPressed: dfClickWrap(() {
+                  openDeskForceCabinet(
+                    url: 'https://deskforce.dr6ter.ru/cabinet/billing?embed=1',
+                    title: 'Тарифы',
+                  );
+                }),
+                child: const Text('Перейти к тарифам',
+                    style: TextStyle(fontWeight: FontWeight.w800)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    DfCabinetSession.ensure();
+    final session = DfCabinetSession.to;
+    return Obx(() {
+      if (!session.chatCallsEnabled.value) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(28, 24, 28, 0),
+              child: DfCabinetTheme.heading('Чат', subtitle: 'Голос и переписка в сессии DeskForce.'),
+            ),
+            const SizedBox(height: 12),
+            Expanded(child: _upgradePrompt()),
+          ],
+        );
+      }
+      return _buildChatBody(context);
+    });
+  }
+
+  Widget _buildChatBody(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -342,3 +411,4 @@ class _CabinetChatScreenState extends State<CabinetChatScreen> {
     );
   }
 }
+

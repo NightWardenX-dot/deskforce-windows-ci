@@ -14,7 +14,70 @@ const kDfUpdateHost = 'deskforce.dr6ter.ru';
 const kDfUpdateJsonUrl = 'https://$kDfUpdateHost/downloads/update.json';
 const kDfUpdateApiUrl = 'https://$kDfUpdateHost/api/client/update';
 
+const kDfUpdateChannelKey = 'df-update-channel';
+const kDfUpdateTestBuildsKey = 'df-test-builds';
+
+/// release (default), beta, alpha — see downloads/update-*.json on server.
+const kDfUpdateChannels = ['release', 'beta', 'alpha'];
+
+String dfUpdateChannelLabel(String ch) {
+  switch (ch) {
+    case 'beta':
+      return 'Бета';
+    case 'alpha':
+      return 'Альфа';
+    default:
+      return 'Релиз';
+  }
+}
+
+String dfUpdateJsonPathForChannel(String channel) {
+  switch (channel.trim().toLowerCase()) {
+    case 'alpha':
+      return '/downloads/update-alpha.json';
+    case 'beta':
+      return '/downloads/update-beta.json';
+    case 'release':
+    case 'stable':
+    default:
+      return '/downloads/update-release.json';
+  }
+}
+
+Future<String> dfGetUpdateChannel() async {
+  try {
+    final v = (await bind.mainGetLocalOption(key: kDfUpdateChannelKey)).trim().toLowerCase();
+    if (kDfUpdateChannels.contains(v)) return v;
+  } catch (_) {}
+  return 'release';
+}
+
+Future<void> dfSetUpdateChannel(String channel) async {
+  final ch = channel.trim().toLowerCase();
+  final safe = kDfUpdateChannels.contains(ch) ? ch : 'release';
+  await bind.mainSetLocalOption(key: kDfUpdateChannelKey, value: safe);
+}
+
+Future<bool> dfTestBuildsEnabled() async {
+  try {
+    return bind.mainGetLocalOption(key: kDfUpdateTestBuildsKey) == 'Y';
+  } catch (_) {
+    return false;
+  }
+}
+
+Future<void> dfSetTestBuildsEnabled(bool on) async {
+  await bind.mainSetLocalOption(key: kDfUpdateTestBuildsKey, value: on ? 'Y' : 'N');
+  if (!on) await dfSetUpdateChannel('release');
+}
+
+Future<Uri> dfUpdateJsonUri() async {
+  final ch = await dfGetUpdateChannel();
+  return Uri.parse('https://$kDfUpdateHost${dfUpdateJsonPathForChannel(ch)}');
+}
+
 const _ink = Color(0xFFE8F4FF);
+const _inkOnLight = Color(0xFF1A2332);
 const _paper = Color(0xFF070B14);
 const _card = Color(0xD60C1422);
 const _brass = Color(0xFF2DD4BF);
@@ -90,8 +153,8 @@ Widget dfUpdateBannerHost(BuildContext context) {
               Expanded(
                 child: Text(
                   'Доступно обновление ${info.version}',
-                  style: TextStyle(
-                    color: _ink.withOpacity(0.86),
+                  style: const TextStyle(
+                    color: _inkOnLight,
                     fontWeight: FontWeight.w700,
                     fontSize: 13.5,
                   ),
@@ -110,7 +173,7 @@ Widget dfUpdateBannerHost(BuildContext context) {
               IconButton(
                 tooltip: 'Скрыть',
                 visualDensity: VisualDensity.compact,
-                icon: Icon(Icons.close, size: 18, color: _ink.withOpacity(0.45)),
+                icon: Icon(Icons.close, size: 18, color: _inkOnLight.withOpacity(0.55)),
                 onPressed: () => _dismissBanner(info.version),
               ),
             ],
@@ -237,11 +300,13 @@ String dfCurrentPlatformKey() {
 Future<DeskForceUpdateInfo?> dfFetchUpdateInfo({
   String? platform,
   String? localVersion,
+  String? channel,
 }) async {
   final plat = platform ?? dfCurrentPlatformKey();
-  // Prefer API (platform slice); fall back to static update.json.
+  final ch = (channel ?? await dfGetUpdateChannel()).trim().toLowerCase();
+  // Prefer API (platform slice); fall back to static update-*.json.
   try {
-    final q = <String, String>{'platform': plat};
+    final q = <String, String>{'platform': plat, 'channel': ch};
     if (localVersion != null && localVersion.trim().isNotEmpty) {
       q['version'] = localVersion.trim();
     }
@@ -256,8 +321,8 @@ Future<DeskForceUpdateInfo?> dfFetchUpdateInfo({
   } catch (_) {}
 
   try {
-    final resp =
-        await http.get(Uri.parse(kDfUpdateJsonUrl)).timeout(const Duration(seconds: 8));
+    final jsonUri = await dfUpdateJsonUri();
+    final resp = await http.get(jsonUri).timeout(const Duration(seconds: 8));
     if (resp.statusCode != 200) return null;
     final doc = jsonDecode(utf8.decode(resp.bodyBytes));
     if (doc is! Map<String, dynamic>) return null;
