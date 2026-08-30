@@ -65,6 +65,14 @@ jobs:
           # Prefer DeskForce icons in deb package
           cp -f deskforce/oem/branding/app_icon.png rustdesk/res/128x128@2x.png || true
           cp -f deskforce/oem/branding/app_icon.svg rustdesk/res/scalable.svg || true
+          grep -q 'deskforce_update.dart' rustdesk/flutter/lib/common/deskforce_update.dart
+          grep -q 'df-update-channel' rustdesk/flutter/lib/common/deskforce_update.dart
+          grep -q 'Тестовые сборки' rustdesk/flutter/lib/desktop/pages/deskforce_settings_page.dart
+          grep -q '_returnToHome' rustdesk/flutter/lib/desktop/pages/cabinet/cabinet_page.dart
+          grep -q 'downloads/changelog.json' rustdesk/flutter/lib/desktop/pages/cabinet/screens/updates_screen.dart
+          grep -q 'downloads/news.json' rustdesk/flutter/lib/desktop/pages/cabinet/screens/news_screen.dart
+          test -f rustdesk/flutter/lib/desktop/pages/cabinet/cabinet_page.dart
+          test -f rustdesk/flutter/lib/desktop/pages/deskforce_settings_page.dart
 
       - name: Install system dependencies
         run: |

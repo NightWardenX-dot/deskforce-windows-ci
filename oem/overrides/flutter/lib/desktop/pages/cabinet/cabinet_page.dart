@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet/cabinet_api.dart';
+import 'package:flutter_hbb/desktop/widgets/tabbar_widget.dart';
+import 'package:get/get.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet/cabinet_session.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet/cabinet_theme.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet/click_sound.dart';
@@ -105,6 +108,17 @@ class _DeskForceCabinetPageState extends State<DeskForceCabinetPage> {
     }
   }
 
+  void _returnToHome() {
+    dfPlayClickSound();
+    try {
+      final tabController = Get.find<DesktopTabController>();
+      tabController.closeBy(DeskForceCabinetPage.tabKey);
+      tabController.jumpToByKey(kTabLabelHomePage);
+    } catch (e) {
+      debugPrint('DeskForce cabinet: return to home failed: $e');
+    }
+  }
+
   Future<void> _openBrowser() async {
     await dfPlayClickSound();
     final uri = Uri.parse(widget.initialUrl.contains('cabinet')
@@ -197,6 +211,16 @@ class _DeskForceCabinetPageState extends State<DeskForceCabinetPage> {
       ),
       child: Row(
         children: [
+          TextButton.icon(
+            onPressed: _returnToHome,
+            icon: const Icon(Icons.arrow_back, size: 18, color: DfCabinetTheme.brass),
+            label: const Text('На главную'),
+            style: TextButton.styleFrom(
+              foregroundColor: DfCabinetTheme.ink,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+            ),
+          ),
+          const SizedBox(width: 4),
           const Icon(Icons.account_circle_outlined,
               color: DfCabinetTheme.brass, size: 20),
           const SizedBox(width: 8),

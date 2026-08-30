@@ -10,7 +10,7 @@ env:
   VCPKG_COMMIT_ID: "120deac3062162151622ca4860575a33844ba10b"
   VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
   OEM_APP_NAME: DeskForce
-  OEM_APP_VERSION: "1.2.0"
+  OEM_APP_VERSION: "1.2.1"
   OEM_ID_SERVER: "78.29.49.98"
   OEM_RELAY_SERVER: "78.29.49.98"
   OEM_API_SERVER: "https://deskforce.dr6ter.ru"
@@ -59,12 +59,20 @@ jobs:
           grep -q "DeskForce" rustdesk/libs/hbb_common/src/config.rs
           grep -q "78.29.49.98" rustdesk/libs/hbb_common/src/config.rs
           ! grep -q "rs-ny.rustdesk.com" rustdesk/libs/hbb_common/src/config.rs
-          grep -q 'version = "1.2.0"' rustdesk/Cargo.toml
+          grep -q 'version = "1.2.1"' rustdesk/Cargo.toml
           grep -q "Name=DeskForce" rustdesk/res/rustdesk.desktop
           grep -q "2DD4BF" rustdesk/flutter/lib/common.dart
           # Prefer DeskForce icons in deb package
           cp -f deskforce/oem/branding/app_icon.png rustdesk/res/128x128@2x.png || true
           cp -f deskforce/oem/branding/app_icon.svg rustdesk/res/scalable.svg || true
+          grep -q 'deskforce_update.dart' rustdesk/flutter/lib/common/deskforce_update.dart
+          grep -q 'df-update-channel' rustdesk/flutter/lib/common/deskforce_update.dart
+          grep -q 'Тестовые сборки' rustdesk/flutter/lib/desktop/pages/deskforce_settings_page.dart
+          grep -q '_returnToHome' rustdesk/flutter/lib/desktop/pages/cabinet/cabinet_page.dart
+          grep -q 'downloads/changelog.json' rustdesk/flutter/lib/desktop/pages/cabinet/screens/updates_screen.dart
+          grep -q 'downloads/news.json' rustdesk/flutter/lib/desktop/pages/cabinet/screens/news_screen.dart
+          test -f rustdesk/flutter/lib/desktop/pages/cabinet/cabinet_page.dart
+          test -f rustdesk/flutter/lib/desktop/pages/deskforce_settings_page.dart
 
       - name: Install system dependencies
         run: |
@@ -164,7 +172,7 @@ jobs:
           fi
           test -n "$DEB" && test -f "$DEB"
           mkdir -p ../out
-          cp -f "$DEB" ../out/deskforce_1.2.0_amd64.deb
+          cp -f "$DEB" ../out/deskforce_1.2.1_amd64.deb
           cp -f "$DEB" ../out/DeskForce.deb
           ls -lh ../out/
           SIZE=$(wc -c < ../out/DeskForce.deb)
@@ -179,5 +187,5 @@ jobs:
           name: DeskForce-Linux-amd64
           path: |
             out/DeskForce.deb
-            out/deskforce_1.2.0_amd64.deb
+            out/deskforce_1.2.1_amd64.deb
           if-no-files-found: error
