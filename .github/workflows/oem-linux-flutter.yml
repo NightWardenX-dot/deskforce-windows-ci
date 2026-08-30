@@ -61,7 +61,7 @@ jobs:
           ! grep -q "rs-ny.rustdesk.com" rustdesk/libs/hbb_common/src/config.rs
           grep -q 'version = "1.2.0"' rustdesk/Cargo.toml
           grep -q "Name=DeskForce" rustdesk/res/rustdesk.desktop
-          grep -q "B8892A" rustdesk/flutter/lib/common.dart
+          grep -q "2DD4BF" rustdesk/flutter/lib/common.dart
           # Prefer DeskForce icons in deb package
           cp -f deskforce/oem/branding/app_icon.png rustdesk/res/128x128@2x.png || true
           cp -f deskforce/oem/branding/app_icon.svg rustdesk/res/scalable.svg || true

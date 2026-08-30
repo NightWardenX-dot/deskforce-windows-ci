@@ -81,7 +81,7 @@ jobs:
           grep -q "78.29.49.98" rustdesk/libs/hbb_common/src/config.rs
           ! grep -q "rs-ny.rustdesk.com" rustdesk/libs/hbb_common/src/config.rs
           grep -q 'version = "1.2.0"' rustdesk/Cargo.toml
-          grep -q "B8892A" rustdesk/flutter/lib/common.dart
+          grep -q "2DD4BF" rustdesk/flutter/lib/common.dart
 
       - name: Install build runtime
         run: |

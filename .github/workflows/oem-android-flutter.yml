@@ -72,10 +72,10 @@ jobs:
           grep -q "DeskForce" rustdesk/flutter/android/app/src/main/res/values/strings.xml
           grep -q 'android:label="DeskForce"' rustdesk/flutter/android/app/src/main/AndroidManifest.xml
           grep -q 'applicationId "ru.deskforce.ud"' rustdesk/flutter/android/app/build.gradle
-          # Paper/brass theme must be in Flutter sources (not stock Colors.blue primary)
-          grep -q 'Color(0xFFB8892A)' rustdesk/flutter/lib/common.dart
-          grep -q 'Color(0xFFF3EFE6)' rustdesk/flutter/lib/common.dart
-          grep -q 'Color(0xFF12161C)' rustdesk/flutter/lib/common.dart
+          # Slate/teal theme must be in Flutter sources (not stock Colors.blue primary)
+          grep -q 'Color(0xFF2DD4BF)' rustdesk/flutter/lib/common.dart
+          grep -q 'Color(0xFF0C1422)' rustdesk/flutter/lib/common.dart
+          grep -q 'Color(0xFFE8F4FF)' rustdesk/flutter/lib/common.dart
           ! grep -q 'primary: Colors.blue' rustdesk/flutter/lib/common.dart
           grep -q 'DeskForce: never stock RustDesk update check' rustdesk/flutter/lib/common.dart
           # All adaptive launcher densities must be DeskForce D-mark (not stock P)
