@@ -176,6 +176,14 @@ class _DeskForceSettingsPageState extends State<DeskForceSettingsPage> {
           _sectionTitle('Обновления'),
           const SizedBox(height: 12),
           _cardBox(children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Text(
+                'Канал обновлений: ${dfUpdateChannelLabel(_updateChannel)}'
+                '${_testBuilds ? '' : ' (только релиз — включите «Тестовые сборки» для смены)'}',
+                style: TextStyle(fontSize: 14, color: _ink.withOpacity(0.72)),
+              ),
+            ),
             _toggle(
               title: 'Тестовые сборки',
               subtitle:

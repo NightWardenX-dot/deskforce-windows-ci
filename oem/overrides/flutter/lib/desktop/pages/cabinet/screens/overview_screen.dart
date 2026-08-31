@@ -138,11 +138,23 @@ class _CabinetOverviewScreenState extends State<CabinetOverviewScreen> {
                   lic == null
                       ? 'Статус недоступен'
                       : (lic['active'] == true
-                          ? '${lic['plan']} · лимит ${lic['concurrent_limit']} · занято ${lic['concurrent_used']}'
+                          ? '${lic['plan']} · сессии ${lic['concurrent_used']}/${lic['concurrent_limit']}'
                           : 'не активна'),
                   style: TextStyle(
                       color: DfCabinetTheme.ink.withOpacity(0.65), fontSize: 14),
                 ),
+                if (lic?['active'] == true) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    DfCabinetSession.to.sessionsHint.isNotEmpty
+                        ? DfCabinetSession.to.sessionsHint
+                        : 'Сессии — одновременные удалённые подключения по тарифу.',
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: DfCabinetTheme.ink.withOpacity(0.55),
+                        height: 1.35),
+                  ),
+                ],
                 if (lic?['over_limit'] == true) ...[
                   const SizedBox(height: 6),
                   const Text('Лимит сессий исчерпан.',

@@ -33,7 +33,9 @@ Future<void> dfPlayClickSound() async {
       // SoundPlayer.Play() returns immediately; a detached powershell would
       // exit and tear down async playback → silence. PlaySync keeps it alive.
       final escaped = path.replaceAll("'", "''");
-      await Process.start(
+      // Fire-and-forget but keep the shell alive until PlaySync finishes.
+      // ignore: unawaited_futures
+      Process.run(
         _windowsPowerShell(),
         [
           '-NoProfile',
@@ -43,7 +45,6 @@ Future<void> dfPlayClickSound() async {
           '-Command',
           "(New-Object Media.SoundPlayer '$escaped').PlaySync()",
         ],
-        mode: ProcessStartMode.detached,
         runInShell: false,
       );
       return;

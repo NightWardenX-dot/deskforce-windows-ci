@@ -367,6 +367,13 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                 ),
             ],
           ),
+          if (s.sessionsHint.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              s.sessionsHint,
+              style: TextStyle(fontSize: 11, color: ink.withOpacity(0.55), height: 1.3),
+            ),
+          ],
           if (s.overLimit.value) ...[
             const SizedBox(height: 6),
             Text(
@@ -1280,6 +1287,10 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.resumed) {
       shouldBeBlocked(_block, canBeBlocked);
+      if (DfCabinetSession.to.loggedIn.value) {
+        // ignore: unawaited_futures
+        DfCabinetSession.to.refresh();
+      }
     }
   }
 

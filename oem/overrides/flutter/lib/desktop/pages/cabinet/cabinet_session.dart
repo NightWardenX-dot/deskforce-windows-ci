@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -23,6 +24,8 @@ class DfCabinetSession extends GetxController {
     }
   }
 
+  static const _presenceInterval = Duration(seconds: 90);
+
   final loggedIn = false.obs;
   final loading = false.obs;
   final username = ''.obs;
@@ -43,10 +46,19 @@ class DfCabinetSession extends GetxController {
   final devices = <Map<String, dynamic>>[].obs;
   final lastError = ''.obs;
 
+  Timer? _presenceTimer;
+
   @override
   void onInit() {
     super.onInit();
     refresh();
+    _schedulePresenceSync();
+  }
+
+  @override
+  void onClose() {
+    _presenceTimer?.cancel();
+    super.onClose();
   }
 
   String get chipLabel {
@@ -63,6 +75,59 @@ class DfCabinetSession extends GetxController {
     if (!licenseActive.value) return 'Лицензия не активна';
     final p = plan.value.isEmpty ? 'тариф' : plan.value;
     return '$p · ${concurrentUsed.value}/${concurrentLimit.value} сессий';
+  }
+
+  /// User-facing hint for concurrent remote sessions (not cabinet logins).
+  String get sessionsHint {
+    if (!loggedIn.value || !licenseActive.value) return '';
+    final limit = concurrentLimit.value;
+    final used = concurrentUsed.value;
+    if (limit <= 0) return '';
+    return 'Одновременные удалённые подключения: $used из $limit. '
+        'Каждое активное соединение с другого ПК занимает слот.';
+  }
+
+  /// Online devices that currently hold remote sessions (conns > 0 when known).
+  List<Map<String, dynamic>> get sessionDevices {
+    final out = <Map<String, dynamic>>[];
+    for (final d in devices) {
+      if (d['is_online'] != true) continue;
+      final conns = d['conns'];
+      if (conns is num && conns <= 0) continue;
+      out.add(d);
+    }
+    if (out.isNotEmpty) return out;
+    return devices.where((d) => d['is_online'] == true).toList();
+  }
+
+  void _schedulePresenceSync() {
+    _presenceTimer?.cancel();
+    _presenceTimer = Timer.periodic(_presenceInterval, (_) {
+      if (CabinetApi.instance.isLoggedIn) {
+        // ignore: unawaited_futures
+        _syncPresence();
+      }
+    });
+  }
+
+  Future<void> _syncPresence() async {
+    if (!CabinetApi.instance.isLoggedIn) return;
+    final id = _readLocalId();
+    if (id.isEmpty) return;
+    await claimLocalDevice(quiet: true);
+    await refresh();
+  }
+
+  List<Map<String, dynamic>> _normalizeDevices(
+      List<Map<String, dynamic>> list, String localId) {
+    if (localId.isEmpty) return list;
+    return list.map((d) {
+      if ((d['device_id'] ?? '').toString() != localId) return d;
+      final copy = Map<String, dynamic>.from(d);
+      copy['is_online'] = true;
+      copy['is_local'] = true;
+      return copy;
+    }).toList();
   }
 
   Future<void> refresh() async {
@@ -118,8 +183,9 @@ class DfCabinetSession extends GetxController {
       } catch (_) {}
 
       final localId = _readLocalId();
+      final normalized = _normalizeDevices(list, localId);
       final linked = localId.isNotEmpty &&
-          list.any((d) => (d['device_id'] ?? '').toString() == localId);
+          normalized.any((d) => (d['device_id'] ?? '').toString() == localId);
 
       loggedIn.value = true;
       username.value = (me['username'] ?? '').toString();
@@ -146,13 +212,17 @@ class DfCabinetSession extends GetxController {
         concurrentUsed.value = 0;
         overLimit.value = false;
       }
-      devices.assignAll(list);
-      deviceCount.value = list.length;
+      devices.assignAll(normalized);
+      deviceCount.value = normalized.length;
       onlineDevices.value =
-          list.where((d) => d['is_online'] == true).length;
+          normalized.where((d) => d['is_online'] == true).length;
       openTickets.value = tickets;
       localDeviceId.value = localId;
       localIdLinked.value = linked;
+      if (!linked && localId.isNotEmpty) {
+        // ignore: unawaited_futures
+        claimLocalDevice(quiet: true);
+      }
       await _syncRustdeskAbAuth(active: true);
     } catch (e) {
       debugPrint('DfCabinetSession.refresh: $e');
@@ -177,23 +247,27 @@ class DfCabinetSession extends GetxController {
   }
 
   /// Bind this PC's RustDesk ID to the cabinet account.
-  Future<bool> claimLocalDevice() async {
+  Future<bool> claimLocalDevice({bool quiet = false}) async {
     if (!CabinetApi.instance.isLoggedIn) return false;
     final id = _readLocalId();
     if (id.isEmpty) return false;
+    var version = '';
+    try {
+      version = (await bind.mainGetVersion()).trim();
+    } catch (_) {}
     try {
       await CabinetApi.instance.post('/devices/claim', body: {
         'device_id': id,
         'hostname': Platform.localHostname,
         'os': Platform.operatingSystem,
-        'version': '',
+        'version': version,
         'note': 'DeskForce клиент',
       });
       localIdLinked.value = true;
       localDeviceId.value = id;
       return true;
     } catch (e) {
-      debugPrint('claimLocalDevice: $e');
+      if (!quiet) debugPrint('claimLocalDevice: $e');
       return false;
     }
   }

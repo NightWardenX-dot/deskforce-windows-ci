@@ -3,6 +3,8 @@ import 'package:flutter_hbb/desktop/pages/cabinet/cabinet_api.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet/cabinet_errors.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet/cabinet_theme.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet/click_sound.dart';
+import 'package:flutter_hbb/desktop/pages/cabinet/cabinet_session.dart';
+import 'package:get/get.dart';
 
 class CabinetDevicesScreen extends StatefulWidget {
   const CabinetDevicesScreen({Key? key}) : super(key: key);
@@ -46,11 +48,23 @@ class _CabinetDevicesScreenState extends State<CabinetDevicesScreen> {
           if (r is Map) list.add(Map<String, dynamic>.from(r));
         }
       }
+      final localId = DfCabinetSession.to.localDeviceId.value;
+      final normalized = localId.isEmpty
+          ? list
+          : list.map((d) {
+              if ((d['device_id'] ?? '').toString() != localId) return d;
+              final copy = Map<String, dynamic>.from(d);
+              copy['is_online'] = true;
+              copy['is_local'] = true;
+              return copy;
+            }).toList();
       if (!mounted) return;
       setState(() {
-        _items = list;
+        _items = normalized;
         _loading = false;
       });
+      // ignore: unawaited_futures
+      DfCabinetSession.to.refresh();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -113,6 +127,96 @@ class _CabinetDevicesScreenState extends State<CabinetDevicesScreen> {
       }
     }
   }
+
+  Widget _sessionsPanel() {
+    return Obx(() {
+      final s = DfCabinetSession.to;
+      if (!s.loggedIn.value || !s.licenseActive.value) {
+        return const SizedBox.shrink();
+      }
+      final hint = s.sessionsHint;
+      final sessionDevs = s.sessionDevices;
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(28, 0, 28, 12),
+        child: DfCabinetTheme.panel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.hub_outlined,
+                      size: 18, color: DfCabinetTheme.brass),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Сессии ${s.concurrentUsed.value}/${s.concurrentLimit.value}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                      color: DfCabinetTheme.ink,
+                    ),
+                  ),
+                ],
+              ),
+              if (hint.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text(
+                  hint,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: DfCabinetTheme.ink.withOpacity(0.62),
+                    height: 1.35,
+                  ),
+                ),
+              ],
+              if (s.overLimit.value) ...[
+                const SizedBox(height: 6),
+                const Text(
+                  'Новые подключения могут быть отклонены — закройте лишние сессии.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: DfCabinetTheme.danger,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+              if (sessionDevs.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Text(
+                  'Онлайн устройства:',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: DfCabinetTheme.ink.withOpacity(0.55),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                ...sessionDevs.take(8).map((d) {
+                  final name =
+                      (d['hostname'] ?? d['device_id'] ?? '—').toString();
+                  final conns = d['conns'];
+                  final local = d['is_local'] == true;
+                  final suffix = conns is num && conns > 0
+                      ? ' · $conns подк.'
+                      : '';
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 3),
+                    child: Text(
+                      '• $name${local ? ' (этот ПК)' : ''}$suffix',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: DfCabinetTheme.ink.withOpacity(0.72),
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ],
+          ),
+        ),
+      );
+    });
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -197,10 +301,14 @@ class _CabinetDevicesScreenState extends State<CabinetDevicesScreen> {
                                             CrossAxisAlignment.start,
                                         children: [
                                           Text(
-                                            (d['hostname'] ??
-                                                    d['device_id'] ??
-                                                    '—')
-                                                .toString(),
+                                            [
+                                              (d['hostname'] ??
+                                                      d['device_id'] ??
+                                                      '—')
+                                                  .toString(),
+                                              if (d['is_local'] == true)
+                                                '(этот ПК)',
+                                            ].join(' '),
                                             style: const TextStyle(
                                                 fontWeight: FontWeight.w700,
                                                 fontSize: 15,
