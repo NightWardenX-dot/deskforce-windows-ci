@@ -553,6 +553,67 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     );
   }
 
+
+  Widget _buildVersionFooter(BuildContext context) {
+    return FutureBuilder<String>(
+      future: bind.mainGetVersion(),
+      builder: (context, snap) {
+        final v = snap.data?.trim() ?? '';
+        if (v.isEmpty) return const SizedBox.shrink();
+        return ValueListenableBuilder<DeskForceUpdateBannerData?>(
+          valueListenable: dfUpdateBannerNotifier,
+          builder: (context, banner, _) {
+            final hasUpdate = banner != null;
+            return Center(
+              child: InkWell(
+                onTap: hasUpdate
+                    ? () => dfShowUpdateDialog(context, banner!.info,
+                        localVersion: banner.localVersion)
+                    : null,
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'DeskForce $v',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: MyTheme.dark.withOpacity(0.45),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (hasUpdate) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0x332DD4BF),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0x552DD4BF)),
+                          ),
+                          child: Text(
+                            '→ ${banner!.info.version}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF2DD4BF),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _buildBlock({required Widget child}) {
     return buildRemoteBlock(
         block: _block, mask: true, use: canBeBlocked, child: child);
