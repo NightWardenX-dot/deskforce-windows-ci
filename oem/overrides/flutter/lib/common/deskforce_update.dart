@@ -1,3 +1,4 @@
+// deskforce_update.dart — DeskForce in-app updater
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -474,6 +475,41 @@ String? _windowsPackerExePath() {
   return null;
 }
 
+
+String _windowsKillProcessesPs() {
+  return """
+function Stop-DeskForceFamily {
+  foreach (\$n in @('DeskForce','rustdesk')) {
+    Get-Process -Name \$n -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+  }
+  foreach (\$im in @('DeskForce.exe','rustdesk.exe')) {
+    & taskkill /F /IM \$im /T 2>\$null | Out-Null
+  }
+}
+Stop-DeskForceFamily
+Start-Sleep -Milliseconds 1200
+""";
+}
+
+Future<void> _windowsStopSiblingProcesses() async {
+  if (!Platform.isWindows) return;
+  // Kill service/tray backend only — main DeskForce.exe exits after spawning updater.
+  try {
+    await Process.run('taskkill', ['/F', '/IM', 'rustdesk.exe', '/T'], runInShell: true);
+  } catch (_) {}
+  await Future.delayed(const Duration(milliseconds: 300));
+}
+
+String? _windowsUpdateTargetExe(String currentExe, String? packer) {
+  if (packer != null && packer.isNotEmpty && File(packer).existsSync()) return packer;
+  if (!_windowsLooksLikePortableExtract(currentExe) &&
+      currentExe.toLowerCase().endsWith('.exe') &&
+      File(currentExe).existsSync()) {
+    return currentExe;
+  }
+  return null;
+}
+
 String _windowsExtractCacheDir(String resolvedExe) {
   final local = Platform.environment['LOCALAPPDATA']?.trim();
   if (local != null && local.isNotEmpty) {
@@ -502,10 +538,11 @@ Future<bool> _applyWindowsUpdate(DeskForceUpdateInfo info) async {
       await unpack.delete(recursive: true);
     }
     await unpack.create(recursive: true);
+    await _windowsStopSiblingProcesses();
     final dest = File(currentExe).parent.path;
     final ps = '''
 \$ErrorActionPreference = 'Stop'
-Start-Sleep -Milliseconds 1200
+${_windowsKillProcessesPs()}
 \$zip = '${_psQuote(zipPath)}'
 \$src = '${_psQuote(unpackDir)}'
 \$dest = '${_psQuote(dest)}'
@@ -544,18 +581,19 @@ throw 'copy_failed'
   if (!_isAllowedUrl(exeUrl) || !exeUrl.toLowerCase().endsWith('.exe')) {
     return false;
   }
-  if (packer == null) {
-    // Older packers do not expose DESKFORCE_PACKER_EXE — cannot safely replace.
+  final targetExe = _windowsUpdateTargetExe(currentExe, packer);
+  if (targetExe == null) {
     return false;
   }
   final newExePath = p.join(tempDir.path, 'deskforce-update-$stamp.exe');
   await _downloadToFile(Uri.parse(exeUrl), newExePath);
   final extractDir = _windowsExtractCacheDir(currentExe);
+  await _windowsStopSiblingProcesses();
   final ps = '''
 \$ErrorActionPreference = 'Stop'
-Start-Sleep -Milliseconds 1500
+${_windowsKillProcessesPs()}
 \$src = '${_psQuote(newExePath)}'
-\$dest = '${_psQuote(packer)}'
+\$dest = '${_psQuote(targetExe)}'
 \$extract = '${_psQuote(extractDir)}'
 for (\$i = 0; \$i -lt 100; \$i++) {
   try {
