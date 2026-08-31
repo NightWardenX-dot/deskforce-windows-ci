@@ -43,11 +43,14 @@ CabinetSection cabinetSectionFromUrl(String url) {
 class DeskForceCabinetPage extends StatefulWidget {
   final String initialUrl;
   final String title;
+  /// When true, hides duplicate top chrome (used inside [DeskForceHubPage]).
+  final bool embedded;
 
   const DeskForceCabinetPage({
     Key? key,
     this.initialUrl = 'https://deskforce.dr6ter.ru/cabinet/?embed=1',
     this.title = 'Личный кабинет',
+    this.embedded = false,
   }) : super(key: key);
 
   static const tabKey = 'deskforce-cabinet';
@@ -113,6 +116,7 @@ class _DeskForceCabinetPageState extends State<DeskForceCabinetPage> {
     try {
       final tabController = Get.find<DesktopTabController>();
       tabController.closeBy(DeskForceCabinetPage.tabKey);
+      tabController.closeBy('deskforce-hub');
       tabController.jumpToByKey(kTabLabelHomePage);
     } catch (e) {
       debugPrint('DeskForce cabinet: return to home failed: $e');
@@ -178,7 +182,7 @@ class _DeskForceCabinetPageState extends State<DeskForceCabinetPage> {
         ),
         child: Column(
           children: [
-            _topBar(),
+            if (!widget.embedded) _topBar(),
             Expanded(
               child: !_loggedIn
                   ? CabinetAuthScreen(

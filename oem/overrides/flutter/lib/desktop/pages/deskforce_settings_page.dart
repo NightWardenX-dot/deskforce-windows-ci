@@ -7,7 +7,6 @@ import 'package:flutter_hbb/common/deskforce_update.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet/cabinet_theme.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet/click_sound.dart';
-import 'package:flutter_hbb/desktop/pages/cabinet_webview_page.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -71,7 +70,7 @@ class _DeskForceSettingsPageState extends State<DeskForceSettingsPage> {
         padding: const EdgeInsets.fromLTRB(28, 24, 28, 40),
         children: [
           const Text(
-            'Настройки DeskForce',
+            'Настройки',
             style: TextStyle(
               fontSize: 28,
               fontWeight: FontWeight.w800,
@@ -81,7 +80,7 @@ class _DeskForceSettingsPageState extends State<DeskForceSettingsPage> {
           ),
           const SizedBox(height: 6),
           Text(
-            'Запуск, окно, локальная сеть и обновления.',
+            'Запуск, окно, локальная сеть и обновления. Личный кабинет — на соседней вкладке.',
             style: TextStyle(fontSize: 15, color: _ink.withOpacity(0.55)),
           ),
           const SizedBox(height: 28),
@@ -291,14 +290,6 @@ class _DeskForceSettingsPageState extends State<DeskForceSettingsPage> {
                           fontSize: 15, color: _ink.withOpacity(0.6))),
                 ],
                 const SizedBox(height: 14),
-                _link('Личный кабинет', () => openDeskForceCabinet()),
-                _link(
-                    'Тарифы',
-                    () => openDeskForceCabinet(
-                          url:
-                              'https://deskforce.dr6ter.ru/cabinet/billing?embed=1',
-                          title: 'Тарифы',
-                        )),
                 _link('Инструкция', () async {
                   await launchUrl(
                       Uri.parse('https://deskforce.dr6ter.ru/guide'),
@@ -306,21 +297,6 @@ class _DeskForceSettingsPageState extends State<DeskForceSettingsPage> {
                 }),
               ]);
             },
-          ),
-          const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: _ink,
-                side: const BorderSide(color: _brass, width: 1.4),
-                backgroundColor: _card,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-              onPressed: () => openDeskForceCabinet(),
-              child: const Text('Открыть личный кабинет',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-            ),
           ),
           const SizedBox(height: 18),
           Container(

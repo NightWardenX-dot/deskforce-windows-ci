@@ -4,7 +4,7 @@ import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_home_page.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_setting_page.dart' show SettingsTabKey;
 import 'package:flutter_hbb/desktop/pages/cabinet_webview_page.dart';
-import 'package:flutter_hbb/desktop/pages/deskforce_settings_page.dart';
+import 'package:flutter_hbb/desktop/pages/deskforce_hub_page.dart';
 import 'package:flutter_hbb/desktop/widgets/tabbar_widget.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
@@ -28,21 +28,9 @@ class DesktopTabPage extends StatefulWidget {
     openDeskForceCabinet(url: url, title: title);
   }
 
-  /// All settings entry points must open DeskForceSettingsPage only.
+  /// Settings + cabinet hub (settings tab requires no login).
   static void onAddSetting({SettingsTabKey initialPage = SettingsTabKey.general}) {
-    try {
-      DesktopTabController tabController = Get.find<DesktopTabController>();
-      tabController.add(TabInfo(
-          key: kTabLabelSettingPage,
-          label: 'Настройки',
-          selectedIcon: Icons.settings,
-          unselectedIcon: Icons.settings_outlined,
-          page: const DeskForceSettingsPage(
-            key: ValueKey('deskforce-settings'),
-          )));
-    } catch (e) {
-      debugPrintStack(label: '$e');
-    }
+    openDeskForceHub(initialTab: DeskForceHubTab.settings);
   }
 }
 
@@ -95,7 +83,7 @@ class _DesktopTabPageState extends State<DesktopTabPage> {
               tail: Offstage(
                 offstage: bind.isIncomingOnly() || bind.isDisableSettings(),
                 child: ActionIcon(
-                  message: 'Настройки',
+                  message: 'Настройки и кабинет',
                   icon: IconFont.menu,
                   onTap: DesktopTabPage.onAddSetting,
                   isClose: false,

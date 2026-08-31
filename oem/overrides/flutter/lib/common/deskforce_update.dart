@@ -152,13 +152,33 @@ Widget dfUpdateBannerHost(BuildContext context) {
               const Icon(Icons.system_update_alt, color: _brass, size: 20),
               const SizedBox(width: 10),
               Expanded(
-                child: Text(
-                  'Доступно обновление ${info.version}',
-                  style: const TextStyle(
-                    color: _inkOnLight,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13.5,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Доступно обновление ${info.version}',
+                      style: const TextStyle(
+                        color: _inkOnLight,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13.5,
+                      ),
+                    ),
+                    if (info.releaseNotes.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        info.releaseNotes.length > 72
+                            ? '${info.releaseNotes.substring(0, 72)}…'
+                            : info.releaseNotes,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: _inkOnLight.withOpacity(0.62),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
               TextButton(
@@ -168,7 +188,7 @@ Widget dfUpdateBannerHost(BuildContext context) {
                   foregroundColor: _brass,
                   padding: const EdgeInsets.symmetric(horizontal: 10),
                 ),
-                child: const Text('Обновление',
+                child: const Text('Обновить',
                     style: TextStyle(fontWeight: FontWeight.w800)),
               ),
               IconButton(
@@ -476,29 +496,95 @@ String? _windowsPackerExePath() {
 }
 
 
-String _windowsKillProcessesPs() {
+String _windowsUpdaterScriptHeader({required int parentPid}) {
   return """
-function Stop-DeskForceFamily {
-  foreach (\$n in @('DeskForce','rustdesk')) {
-    Get-Process -Name \$n -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+\$ErrorActionPreference = 'Stop'
+\$ParentPid = $parentPid
+
+function Wait-ParentExit {
+  param([int]\$Pid, [int]\$MaxSec = 45)
+  if (\$Pid -le 0) { return }
+  for (\$i = 0; \$i -lt \$MaxSec * 4; \$i++) {
+    if (-not (Get-Process -Id \$Pid -ErrorAction SilentlyContinue)) { return }
+    Start-Sleep -Milliseconds 250
   }
+}
+
+function Stop-DeskForceFamily {
+  param([int]\$ExcludePid = 0)
+  foreach (\$svc in @('DeskForce','rustdesk')) {
+    & sc stop \$svc 2>\$null | Out-Null
+  }
+  Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+    Where-Object { \$_.Name -in @('DeskForce.exe','rustdesk.exe') -and \$_.ProcessId -ne \$ExcludePid } |
+    ForEach-Object {
+      Stop-Process -Id \$_.ProcessId -Force -ErrorAction SilentlyContinue
+    }
   foreach (\$im in @('DeskForce.exe','rustdesk.exe')) {
     & taskkill /F /IM \$im /T 2>\$null | Out-Null
   }
 }
-Stop-DeskForceFamily
-Start-Sleep -Milliseconds 1200
-""";
+
+function Wait-DeskForceGone {
+  param([int]\$MaxSec = 90)
+  for (\$i = 0; \$i -lt \$MaxSec * 2; \$i++) {
+    \$alive = Get-Process -Name DeskForce,rustdesk -ErrorAction SilentlyContinue
+    if (-not \$alive) { return \$true }
+    Stop-DeskForceFamily
+    Start-Sleep -Milliseconds 500
+  }
+  return \$false
 }
 
+function Copy-WithRetry {
+  param([string]\$Src, [string]\$Dest, [int]\$Attempts = 120)
+  for (\$i = 0; \$i -lt \$Attempts; \$i++) {
+    try {
+      Copy-Item -Path \$Src -Destination \$Dest -Force -ErrorAction Stop
+      return \$true
+    } catch {
+      Stop-DeskForceFamily
+      Start-Sleep -Milliseconds 500
+    }
+  }
+  return \$false
+}
+
+function Schedule-RebootReplace {
+  param([string]\$Src, [string]\$Dest)
+  Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+public class DfMoveFileEx {
+  [DllImport("kernel32.dll", SetLastError=true, CharSet=CharSet.Unicode)]
+  public static extern bool MoveFileEx(string lpExistingFileName, string lpNewFileName, int dwFlags);
+}
+'@
+  [void][DfMoveFileEx]::MoveFileEx(\$Dest, \$null, 4)
+  [void][DfMoveFileEx]::MoveFileEx(\$Src, \$Dest, 4)
+}
+
+Wait-ParentExit -Pid \$ParentPid
+Stop-DeskForceFamily
+if (-not (Wait-DeskForceGone)) {
+  throw 'processes_still_running'
+}
+""";
+}
 Future<void> _windowsStopSiblingProcesses() async {
   if (!Platform.isWindows) return;
-  // Kill service/tray backend only — main DeskForce.exe exits after spawning updater.
+  final myPid = pid;
   try {
     await Process.run('taskkill', ['/F', '/IM', 'rustdesk.exe', '/T'], runInShell: true);
+    await Process.run(
+      'taskkill',
+      ['/F', '/IM', 'DeskForce.exe', '/FI', 'PID ne $myPid', '/T'],
+      runInShell: true,
+    );
   } catch (_) {}
-  await Future.delayed(const Duration(milliseconds: 300));
+  await Future.delayed(const Duration(milliseconds: 400));
 }
+
 
 String? _windowsUpdateTargetExe(String currentExe, String? packer) {
   if (packer != null && packer.isNotEmpty && File(packer).existsSync()) return packer;
@@ -524,6 +610,7 @@ Future<bool> _applyWindowsUpdate(DeskForceUpdateInfo info) async {
   final tempDir = await getTemporaryDirectory();
   final stamp = DateTime.now().millisecondsSinceEpoch;
   final scriptPath = p.join(tempDir.path, 'deskforce-update-$stamp.ps1');
+  final parentPid = pid;
 
   final packer = _windowsPackerExePath();
   final portable = _windowsLooksLikePortableExtract(currentExe);
@@ -541,8 +628,7 @@ Future<bool> _applyWindowsUpdate(DeskForceUpdateInfo info) async {
     await _windowsStopSiblingProcesses();
     final dest = File(currentExe).parent.path;
     final ps = '''
-\$ErrorActionPreference = 'Stop'
-${_windowsKillProcessesPs()}
+${_windowsUpdaterScriptHeader(parentPid: parentPid)}
 \$zip = '${_psQuote(zipPath)}'
 \$src = '${_psQuote(unpackDir)}'
 \$dest = '${_psQuote(dest)}'
@@ -560,6 +646,7 @@ for (\$i = 0; \$i -lt 80; \$i++) {
     Start-Process -FilePath \$exe
     exit 0
   } catch {
+    Stop-DeskForceFamily
     Start-Sleep -Milliseconds 500
   }
 }
@@ -568,13 +655,12 @@ throw 'copy_failed'
     await File(scriptPath).writeAsString(ps, flush: true);
     await Process.start(
       'powershell',
-      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath],
+      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', scriptPath],
       mode: ProcessStartMode.detached,
     );
     return true;
   }
 
-  // Single-file portable (typical DeskForce.exe download): replace the packer EXE.
   final exeUrl = _isAllowedUrl(info.downloadUrl)
       ? info.downloadUrl
       : info.preferredDownloadUrl;
@@ -590,30 +676,26 @@ throw 'copy_failed'
   final extractDir = _windowsExtractCacheDir(currentExe);
   await _windowsStopSiblingProcesses();
   final ps = '''
-\$ErrorActionPreference = 'Stop'
-${_windowsKillProcessesPs()}
+${_windowsUpdaterScriptHeader(parentPid: parentPid)}
 \$src = '${_psQuote(newExePath)}'
 \$dest = '${_psQuote(targetExe)}'
 \$extract = '${_psQuote(extractDir)}'
-for (\$i = 0; \$i -lt 100; \$i++) {
-  try {
-    Copy-Item -Path \$src -Destination \$dest -Force -ErrorAction Stop
-    if (Test-Path \$extract) {
-      Remove-Item -Path \$extract -Recurse -Force -ErrorAction SilentlyContinue
-    }
-    Start-Sleep -Milliseconds 300
-    Start-Process -FilePath \$dest
-    exit 0
-  } catch {
-    Start-Sleep -Milliseconds 500
+if (Copy-WithRetry -Src \$src -Dest \$dest) {
+  if (Test-Path \$extract) {
+    Remove-Item -Path \$extract -Recurse -Force -ErrorAction SilentlyContinue
   }
+  Start-Sleep -Milliseconds 300
+  Start-Process -FilePath \$dest
+  exit 0
 }
-throw 'copy_failed'
+Schedule-RebootReplace -Src \$src -Dest \$dest
+Start-Process -FilePath \$dest -ErrorAction SilentlyContinue
+exit 0
 ''';
   await File(scriptPath).writeAsString(ps, flush: true);
   await Process.start(
     'powershell',
-    ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath],
+    ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', scriptPath],
     mode: ProcessStartMode.detached,
   );
   return true;
@@ -625,7 +707,7 @@ Future<void> dfDownloadAndExecute(BuildContext context, DeskForceUpdateInfo info
   try {
     await _showUpdateProgress(
       context,
-      Platform.isWindows ? 'Устанавливаем обновление...' : 'Открываем обновление...',
+      Platform.isWindows ? 'Завершаем процессы и устанавливаем…' : 'Открываем обновление...',
     );
     if (Platform.isWindows) {
       final started = await _applyWindowsUpdate(info);

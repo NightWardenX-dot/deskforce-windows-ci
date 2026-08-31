@@ -15,6 +15,7 @@ import 'package:flutter_hbb/desktop/pages/cabinet/cabinet_session.dart';
 import 'package:flutter_hbb/common/deskforce_startup.dart';
 import 'package:flutter_hbb/common/deskforce_update.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_tab_page.dart';
+import 'package:flutter_hbb/desktop/pages/deskforce_hub_page.dart';
 import 'package:flutter_hbb/desktop/widgets/update_progress.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/server_model.dart';
@@ -74,17 +75,10 @@ class _DesktopHomePageState extends State<DesktopHomePage>
             Positioned.fill(
               child: CustomPaint(painter: _DeskForcePaperGridPainter()),
             ),
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: SafeArea(
-                bottom: false,
-                child: dfUpdateBannerHost(context),
-              ),
-            ),
             Positioned.fill(
-              child: LayoutBuilder(
+              child: ValueListenableBuilder<DeskForceUpdateBannerData?>(
+                valueListenable: dfUpdateBannerNotifier,
+                builder: (context, _, __) => LayoutBuilder(
                 builder: (context, constraints) {
                   // Zero/non-finite width happens for a frame while HWND sizes —
                   // prefer wide to avoid a narrow→wide layout flip on open.
@@ -132,9 +126,10 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                       _stationCard(child: ConnectionPage(key: _connectionPageKey)),
                     ],
                   ];
+                  final bannerTop = dfUpdateBannerNotifier.value != null ? 58.0 : 0.0;
                   final pad = EdgeInsets.fromLTRB(
                     wide ? 28 : 18,
-                    18,
+                    18 + bannerTop,
                     wide ? 28 : 18,
                     28,
                   );
@@ -191,32 +186,19 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                 },
               ),
             ),
+            ),
             Positioned(
-              right: 14,
-              bottom: 12,
-              child: InkWell(
-                onTap: DesktopTabPage.onAddSetting,
-                onHover: (v) => _editHover.value = v,
-                child: Obx(() => Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: _editHover.value
-                            ? const Color(0x332DD4BF)
-                            : const Color(0xD60C1422),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0x552DD4BF)),
-                      ),
-                      child: Text(
-                        'Настройки',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: _editHover.value
-                              ? MyTheme.accent
-                              : ink.withOpacity(0.65),
-                        ),
-                      ),
-                    )),
+              top: 0,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                bottom: false,
+                child: Material(
+                  elevation: 12,
+                  color: Colors.transparent,
+                  shadowColor: Colors.black54,
+                  child: dfUpdateBannerHost(context),
+                ),
               ),
             ),
           ],
@@ -386,11 +368,17 @@ class _DesktopHomePageState extends State<DesktopHomePage>
             spacing: 8,
             runSpacing: 6,
             children: [
-              _cabinetChip(
-                'Устройства ${s.onlineDevices.value}/${s.deviceCount.value}',
-                onTap: () => openDeskForceCabinet(
-                  url: 'https://deskforce.dr6ter.ru/cabinet/devices?embed=1',
-                  title: 'Устройства',
+              Tooltip(
+                message: s.sessionsHint.isNotEmpty
+                    ? s.sessionsHint
+                    : 'Устройства в личном кабинете',
+                child: _cabinetChip(
+                  'Устройства ${s.onlineDevices.value}/${s.deviceCount.value}',
+                  onTap: () => openDeskForceHub(
+                    initialTab: DeskForceHubTab.cabinet,
+                    cabinetUrl: 'https://deskforce.dr6ter.ru/cabinet/devices?embed=1',
+                    cabinetTitle: 'Устройства',
+                  ),
                 ),
               ),
               _cabinetChip(
@@ -402,9 +390,10 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                     await s.claimLocalDevice();
                     await s.refresh();
                   } else {
-                    openDeskForceCabinet(
-                      url: 'https://deskforce.dr6ter.ru/cabinet/devices?embed=1',
-                      title: 'Устройства',
+                    openDeskForceHub(
+                      initialTab: DeskForceHubTab.cabinet,
+                      cabinetUrl: 'https://deskforce.dr6ter.ru/cabinet/devices?embed=1',
+                      cabinetTitle: 'Устройства',
                     );
                   }
                 },
@@ -412,16 +401,18 @@ class _DesktopHomePageState extends State<DesktopHomePage>
               if (s.openTickets.value > 0)
                 _cabinetChip(
                   'Тикеты: ${s.openTickets.value}',
-                  onTap: () => openDeskForceCabinet(
-                    url: 'https://deskforce.dr6ter.ru/cabinet/support?embed=1',
-                    title: 'Поддержка',
+                  onTap: () => openDeskForceHub(
+                    initialTab: DeskForceHubTab.cabinet,
+                    cabinetUrl: 'https://deskforce.dr6ter.ru/cabinet/support?embed=1',
+                    cabinetTitle: 'Поддержка',
                   ),
                 ),
               _cabinetChip(
                 'Тарифы',
-                onTap: () => openDeskForceCabinet(
-                  url: 'https://deskforce.dr6ter.ru/cabinet/billing?embed=1',
-                  title: 'Тарифы',
+                onTap: () => openDeskForceHub(
+                  initialTab: DeskForceHubTab.cabinet,
+                  cabinetUrl: 'https://deskforce.dr6ter.ru/cabinet/billing?embed=1',
+                  cabinetTitle: 'Тарифы',
                 ),
               ),
             ],
@@ -506,10 +497,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
           backgroundColor: const Color(0xD60C1422),
         ),
         onPressed: () {
-          openDeskForceCabinet(
-            url: 'https://deskforce.dr6ter.ru/cabinet/?embed=1',
-            title: 'Личный кабинет',
-          );
+          openDeskForceHub(initialTab: DeskForceHubTab.cabinet);
         },
         icon: Icon(
           loggedIn ? Icons.account_circle : Icons.account_circle_outlined,
@@ -539,23 +527,28 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       );
     }
 
-    return Wrap(
-      alignment: WrapAlignment.center,
-      spacing: 18,
-      runSpacing: 8,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        link('Личный кабинет', () {
-          openDeskForceCabinet(
-            url: 'https://deskforce.dr6ter.ru/cabinet/?embed=1',
-            title: 'Личный кабинет',
-          );
-        }),
-        link('Тарифы', () {
-          openDeskForceCabinet(
-            url: 'https://deskforce.dr6ter.ru/cabinet/billing?embed=1',
-            title: 'Тарифы',
-          );
-        }),
+        Wrap(
+          alignment: WrapAlignment.center,
+          spacing: 18,
+          runSpacing: 8,
+          children: [
+            link('Настройки и кабинет', () {
+              openDeskForceHub(initialTab: DeskForceHubTab.settings);
+            }),
+            link('Тарифы', () {
+              openDeskForceHub(
+                initialTab: DeskForceHubTab.cabinet,
+                cabinetUrl: 'https://deskforce.dr6ter.ru/cabinet/billing?embed=1',
+                cabinetTitle: 'Тарифы',
+              );
+            }),
+          ],
+        ),
+        const SizedBox(height: 10),
+        _buildVersionFooter(context),
       ],
     );
   }
@@ -645,7 +638,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
             border: Border.all(color: const Color(0x552DD4BF)),
           ),
           child: Text(
-            'Настройки',
+            'Настройки и кабинет',
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w700,
