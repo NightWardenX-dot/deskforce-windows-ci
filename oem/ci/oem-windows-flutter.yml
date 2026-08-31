@@ -294,6 +294,7 @@ jobs:
           SOURCE_DIR="$(cygpath -w "$PWD/deskforce-pack")"
           OUTPUT_DIR="$(cygpath -w "$PWD/../out")"
           test -f "$ISS"
+          export MSYS2_ARG_CONV_EXCL='*'
           "$ISCC" "$ISS" "/DMyAppVersion=${{ env.OEM_APP_VERSION }}" "/DSourceDir=${SOURCE_DIR}" "/DOutputDir=${OUTPUT_DIR}"
           ls -lh ../out/DeskForce-Setup.exe
           SETUP_BYTES=$(wc -c < ../out/DeskForce-Setup.exe)
