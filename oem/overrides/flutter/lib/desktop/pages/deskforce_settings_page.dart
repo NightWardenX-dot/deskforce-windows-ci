@@ -8,6 +8,9 @@ import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet/cabinet_theme.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet/click_sound.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
+import 'package:flutter_hbb/models/server_model.dart';
+import 'package:flutter_hbb/desktop/pages/desktop_home_page.dart' show setPasswordDialog;
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// DeskForce slate/teal settings — single scroll, site visual language.
@@ -159,6 +162,10 @@ class _DeskForceSettingsPageState extends State<DeskForceSettingsPage> {
               ),
             ),
           ]),
+          const SizedBox(height: 28),
+          _sectionTitle('Доступ к этому ПК'),
+          const SizedBox(height: 12),
+          _buildAccessSecurityCard(),
           const SizedBox(height: 28),
           _sectionTitle('Локальная сеть'),
           const SizedBox(height: 12),

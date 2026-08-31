@@ -238,11 +238,21 @@ class _CabinetProfileScreenState extends State<CabinetProfileScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text('Смена пароля',
+              const Text('Смена пароля кабинета',
                   style: TextStyle(
                       fontWeight: FontWeight.w800,
                       fontSize: 16,
                       color: DfCabinetTheme.ink)),
+              const SizedBox(height: 6),
+              Text(
+                'Пароль для входа в личный кабинет. Пароль доступа к этому ПК (для удалённого подключения) '
+                'меняется на главном экране DeskForce — иконка карандаша у поля «Пароль».',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: DfCabinetTheme.ink.withOpacity(0.58),
+                  height: 1.35,
+                ),
+              ),
               const SizedBox(height: 10),
               TextField(
                     style: DfCabinetTheme.inputStyle,

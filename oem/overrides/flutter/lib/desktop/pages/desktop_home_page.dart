@@ -808,7 +808,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                       ),
                     ),
                   ),
-                  onTap: DesktopTabPage.onAddSetting,
+                  onTap: () => setPasswordDialog(),
                   onHover: (value) => editHover.value = value,
                 ),
             ],

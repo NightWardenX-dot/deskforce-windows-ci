@@ -7,6 +7,7 @@ import 'package:flutter_hbb/desktop/pages/cabinet/cabinet_api.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/models/ab_model.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
+import 'package:flutter_hbb/models/state_model.dart';
 import 'package:get/get.dart';
 
 /// Shared cabinet session — surfaces license, devices, tickets on the main UI.
@@ -74,7 +75,7 @@ class DfCabinetSession extends GetxController {
     if (!loggedIn.value) return '';
     if (!licenseActive.value) return 'Лицензия не активна';
     final p = plan.value.isEmpty ? 'тариф' : plan.value;
-    return '$p · ${concurrentUsed.value}/${concurrentLimit.value} сессий';
+    return '$p · ${concurrentUsed.value}/${concurrentLimit.value} удал. сессий';
   }
 
   /// User-facing hint for concurrent remote sessions (not cabinet logins).
@@ -83,8 +84,8 @@ class DfCabinetSession extends GetxController {
     final limit = concurrentLimit.value;
     final used = concurrentUsed.value;
     if (limit <= 0) return '';
-    return 'Одновременные удалённые подключения: $used из $limit. '
-        'Каждое активное соединение с другого ПК занимает слот.';
+    return 'Сессия — одно одновременное удалённое подключение к любому ПК в сети DeskForce '
+        '(не вход в кабинет). Сейчас занято: $used из $limit.';
   }
 
   /// Online devices that currently hold remote sessions (conns > 0 when known).
@@ -118,14 +119,25 @@ class DfCabinetSession extends GetxController {
     await refresh();
   }
 
+  bool get _localServiceOnline {
+    try {
+      return stateGlobal.svcStatus.value == SvcStatus.ready;
+    } catch (_) {
+      return true;
+    }
+  }
+
   List<Map<String, dynamic>> _normalizeDevices(
       List<Map<String, dynamic>> list, String localId) {
     if (localId.isEmpty) return list;
     return list.map((d) {
       if ((d['device_id'] ?? '').toString() != localId) return d;
       final copy = Map<String, dynamic>.from(d);
-      copy['is_online'] = true;
       copy['is_local'] = true;
+      // Prefer live service state for «этот ПК»; server heartbeat may lag.
+      if (_localServiceOnline) {
+        copy['is_online'] = true;
+      }
       return copy;
     }).toList();
   }

@@ -5,6 +5,7 @@ import 'package:flutter_hbb/desktop/pages/cabinet/cabinet_theme.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet/click_sound.dart';
 import 'package:flutter_hbb/desktop/pages/cabinet/cabinet_session.dart';
 import 'package:get/get.dart';
+import 'package:flutter_hbb/models/state_model.dart';
 
 class CabinetDevicesScreen extends StatefulWidget {
   const CabinetDevicesScreen({Key? key}) : super(key: key);
@@ -54,8 +55,10 @@ class _CabinetDevicesScreenState extends State<CabinetDevicesScreen> {
           : list.map((d) {
               if ((d['device_id'] ?? '').toString() != localId) return d;
               final copy = Map<String, dynamic>.from(d);
-              copy['is_online'] = true;
               copy['is_local'] = true;
+              if (stateGlobal.svcStatus.value == SvcStatus.ready) {
+                copy['is_online'] = true;
+              }
               return copy;
             }).toList();
       if (!mounted) return;
@@ -148,7 +151,7 @@ class _CabinetDevicesScreenState extends State<CabinetDevicesScreen> {
                       size: 18, color: DfCabinetTheme.brass),
                   const SizedBox(width: 8),
                   Text(
-                    'Сессии ${s.concurrentUsed.value}/${s.concurrentLimit.value}',
+                    'Удал. сессии ${s.concurrentUsed.value}/${s.concurrentLimit.value}',
                     style: const TextStyle(
                       fontWeight: FontWeight.w800,
                       fontSize: 15,
@@ -182,7 +185,7 @@ class _CabinetDevicesScreenState extends State<CabinetDevicesScreen> {
               if (sessionDevs.isNotEmpty) ...[
                 const SizedBox(height: 10),
                 Text(
-                  'Онлайн устройства:',
+                  'Устройства с активными подключениями:',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
@@ -230,7 +233,8 @@ class _CabinetDevicesScreenState extends State<CabinetDevicesScreen> {
               Expanded(
                 child: DfCabinetTheme.heading('Устройства',
                     subtitle:
-                        'Привязанные клиенты. Неактивные (офлайн) удаляйте кнопкой «Удалить».'),
+                        'Привязанные клиенты. «Онлайн» — клиент DeskForce запущен и отвечает на сервере. '
+                        'Неактивные (офлайн) удаляйте кнопкой «Удалить».'),
               ),
               IconButton(
                 tooltip: 'Обновить',
@@ -240,6 +244,7 @@ class _CabinetDevicesScreenState extends State<CabinetDevicesScreen> {
             ],
           ),
         ),
+        _sessionsPanel(),
         const SizedBox(height: 16),
         Expanded(
           child: _loading
