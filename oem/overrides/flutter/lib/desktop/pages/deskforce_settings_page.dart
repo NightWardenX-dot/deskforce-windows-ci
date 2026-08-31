@@ -329,6 +329,59 @@ class _DeskForceSettingsPageState extends State<DeskForceSettingsPage> {
     );
   }
 
+  Widget _buildAccessSecurityCard() {
+    return ChangeNotifierProvider.value(
+      value: gFFI.serverModel,
+      child: Consumer<ServerModel>(
+        builder: (context, model, _) {
+          final showOneTime = model.approveMode != 'click' &&
+              model.verificationMethod != kUsePermanentPassword;
+          return _cardBox(children: [
+            Text(
+              showOneTime
+                  ? 'Сейчас используется одноразовый пароль — он меняется автоматически. '
+                      'Нажмите «Обновить», чтобы выдать новый.'
+                  : 'Постоянный пароль — для подключения к этому компьютеру. '
+                      'Не путайте с паролем входа в личный кабинет.',
+              style: TextStyle(fontSize: 14, color: _ink.withOpacity(0.62), height: 1.4),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    model.serverPasswd.text.isEmpty ? '—' : model.serverPasswd.text,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.5,
+                      color: _ink,
+                    ),
+                  ),
+                ),
+                if (showOneTime)
+                  TextButton.icon(
+                    onPressed: () => bind.mainUpdateTemporaryPassword(),
+                    icon: const Icon(Icons.refresh, color: _brass, size: 20),
+                    label: const Text('Обновить',
+                        style: TextStyle(fontWeight: FontWeight.w700, color: _brass)),
+                  ),
+                TextButton.icon(
+                  onPressed: () => setPasswordDialog(),
+                  icon: const Icon(Icons.edit_outlined, color: _brass, size: 20),
+                  label: Text(
+                    showOneTime ? 'Задать постоянный' : 'Сменить пароль',
+                    style: const TextStyle(fontWeight: FontWeight.w700, color: _brass),
+                  ),
+                ),
+              ],
+            ),
+          ]);
+        },
+      ),
+    );
+  }
+
   Widget _sectionTitle(String text) {
     return Text(
       text.toUpperCase(),
