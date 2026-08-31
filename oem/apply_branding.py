@@ -1490,6 +1490,31 @@ def patch_portable_extract_dir(src: pathlib.Path, app_name: str = "DeskForce") -
             print("WARN: portable APP_PREFIX pattern miss", file=sys.stderr)
 
 
+
+def patch_core_main_tray(src: pathlib.Path) -> None:
+    """DeskForce: spawn native --tray on Windows for portable + installed builds."""
+    path = src / "src" / "core_main.rs"
+    if not path.is_file():
+        print("WARN: core_main.rs missing", file=sys.stderr)
+        return
+    body = path.read_text(encoding="utf-8", errors="ignore")
+    old = """        #[cfg(target_os = "windows")]
+        let should_check_start_tray = crate::platform::is_self_service_running()
+            && crate::platform::is_cur_exe_the_installed();
+        if should_check_start_tray && !crate::check_process("--tray", true) {"""
+    new = """        #[cfg(target_os = "windows")]
+        // DeskForce OEM: always ensure native tray (portable + installed).
+        let should_check_start_tray = true;
+        if should_check_start_tray && !crate::check_process("--tray", true) {"""
+    if old in body:
+        body = body.replace(old, new, 1)
+        path.write_text(body, encoding="utf-8")
+        print("Patched: core_main.rs DeskForce tray autospawn")
+    elif "DeskForce OEM: always ensure native tray" in body:
+        print("OK already: core_main.rs tray autospawn")
+    else:
+        print("WARN: core_main.rs tray pattern miss", file=sys.stderr)
+
 def patch_main_window_startup(src: pathlib.Path) -> None:
     """Larger centered main window; honor DeskForce startup options."""
     path = src / "flutter" / "lib" / "main.dart"
@@ -1718,6 +1743,7 @@ def main() -> int:
 
     patch_portable_extract_dir(src, app_name)
     patch_portable_packer_source_exe_env(src)
+    patch_core_main_tray(src)
     patch_main_window_startup(src)
     patch_fullscreen_toggle(src)
     patch_disable_maximize_gate(src)

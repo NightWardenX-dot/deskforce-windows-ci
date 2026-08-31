@@ -10,7 +10,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="${DOWNLOADS_DIR:-$ROOT/downloads}"
 LIVE="${LIVE_DOWNLOADS_DIR:-/www/wwwroot/rustdesk-panel/downloads}"
 BASE_URL="${OEM_API_SERVER:-https://deskforce.dr6ter.ru}"
-VER="${OEM_APP_VERSION:-1.2.0-beta.7}"
+VER="${OEM_APP_VERSION:-1.2.6}"
 # Optional per-platform overrides (preserve other platforms when publishing one OS)
 VER_WIN="${OEM_APP_VERSION_WINDOWS:-$VER}"
 VER_AND="${OEM_APP_VERSION_ANDROID:-$VER}"
@@ -36,7 +36,7 @@ if [[ -f "$OUT/update.json" ]]; then
     VER_WIN="$VER"; VER_AND="$VER"; VER_LIN="$VER"; VER_MAC="$VER"
   fi
 fi
-NOTES_WIN="${UPDATE_NOTES_WIN:-Актуальная сборка DeskForce для Windows (тема paper/brass). Один файл DeskForce.exe — скачайте и запустите.}"
+NOTES_WIN="${UPDATE_NOTES_WIN:-DeskForce 1.2.6 для Windows: DeskForce-Setup.exe — установщик (рекомендуется), DeskForce.exe — portable. Иконка в трее после установки/автозапуска.}"
 NOTES_AND="${UPDATE_NOTES_ANDROID:-Актуальная сборка DeskForce для Android.}"
 NOTES_LIN="${UPDATE_NOTES_LINUX:-Актуальная сборка DeskForce для Linux (amd64 .deb).}"
 NOTES_MAC="${UPDATE_NOTES_MACOS:-macOS-сборка DeskForce (unsigned DMG для Apple Silicon). Подпись Apple не включена — при первом запуске ПКМ → Открыть или xattr -cr.}"
@@ -50,6 +50,7 @@ done
 now="$(date -Iseconds)"
 win_exe="${BASE_URL}/downloads/windows/DeskForce.exe"
 win_zip="${BASE_URL}/downloads/windows/DeskForce-Windows-paper-brass.zip"
+win_setup="${BASE_URL}/downloads/windows/DeskForce-Setup.exe"
 # Prefer paper-brass zip name if present; else x64 zip
 if [[ -f "$OUT/windows/DeskForce-Windows-x64.zip" && ! -f "$OUT/windows/DeskForce-Windows-paper-brass.zip" ]]; then
   win_zip="${BASE_URL}/downloads/windows/DeskForce-Windows-x64.zip"
@@ -92,6 +93,8 @@ android_available=false
 
 win_available=false
 [[ -f "$OUT/windows/DeskForce.exe" || -f "$LIVE/windows/DeskForce.exe" ]] && win_available=true
+win_setup_available=false
+[[ -f "$OUT/windows/DeskForce-Setup.exe" || -f "$LIVE/windows/DeskForce-Setup.exe" ]] && win_setup_available=true
 
 mkdir -p "$OUT"
 cat > "$OUT/update.json" <<JSON
@@ -106,8 +109,11 @@ cat > "$OUT/update.json" <<JSON
       "mandatory": false,
       "download_url": "$win_exe",
       "download_urls": {
-        "exe": "$win_exe"
+        "exe": "$win_exe",
+        "setup": "$win_setup",
+        "zip": "$win_zip"
       },
+      "setup_available": $win_setup_available,
       "release_notes": $(python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$NOTES_WIN"),
       "available": $win_available
     },

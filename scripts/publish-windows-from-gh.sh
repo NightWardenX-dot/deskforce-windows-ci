@@ -8,7 +8,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="${DOWNLOADS_DIR:-$ROOT/downloads}/windows"
 REPO="${REPO:-NightWardenX-dot/deskforce-windows-ci}"
-VER="${OEM_APP_VERSION:-1.2.0-beta.7}"
+VER="${OEM_APP_VERSION:-1.2.6}"
 RUN_ID="${1:-}"
 
 if [[ -z "$RUN_ID" ]]; then
@@ -34,8 +34,13 @@ gh run download "$RUN_ID" -R "$REPO" -n DeskForce-Windows-paper-brass -D "$TMP"
 
 EXE="$(find "$TMP" -name 'DeskForce.exe' -type f | head -1)"
 ZIP="$(find "$TMP" -name 'DeskForce-Windows-paper-brass.zip' -type f | head -1)"
+SETUP="$(find "$TMP" -name 'DeskForce-Setup.exe' -type f | head -1)"
 test -n "$EXE" && test -f "$EXE"
 test -n "$ZIP" && test -f "$ZIP"
+if [[ -n "${SETUP:-}" && -f "$SETUP" ]]; then
+  SETUP_BYTES="$(wc -c < "$SETUP")"
+  test "$SETUP_BYTES" -gt 10000000
+fi
 EXE_BYTES="$(wc -c < "$EXE")"
 ZIP_BYTES="$(wc -c < "$ZIP")"
 test "$EXE_BYTES" -gt 10000000
@@ -52,7 +57,11 @@ fi
 
 cp -f "$EXE" "$OUT/DeskForce.exe"
 cp -f "$ZIP" "$OUT/DeskForce-Windows-paper-brass.zip"
+if [[ -n "${SETUP:-}" && -f "$SETUP" ]]; then
+  cp -f "$SETUP" "$OUT/DeskForce-Setup.exe"
+fi
 chmod 644 "$OUT/DeskForce.exe" "$OUT/DeskForce-Windows-paper-brass.zip"
+[[ -f "$OUT/DeskForce-Setup.exe" ]] && chmod 644 "$OUT/DeskForce-Setup.exe" || true
 
 HEAD_SHA="$(gh run view "$RUN_ID" -R "$REPO" --json headSha --jq .headSha | cut -c1-7)"
 NOW="$(date -Iseconds)"
@@ -79,6 +88,7 @@ data.update({
     "zip_bytes": $ZIP_BYTES,
     "download": "https://deskforce.dr6ter.ru/downloads/windows/DeskForce.exe",
     "download_zip": "https://deskforce.dr6ter.ru/downloads/windows/DeskForce-Windows-paper-brass.zip",
+    "download_setup": "https://deskforce.dr6ter.ru/downloads/windows/DeskForce-Setup.exe",
     "update": "https://deskforce.dr6ter.ru/downloads/update.json",
     "source": "$REPO artifact DeskForce-Windows-paper-brass (run $RUN_ID)",
     "updated_at": "$NOW",
@@ -94,5 +104,5 @@ PY
 OEM_APP_VERSION_WINDOWS="$VER" "$ROOT/scripts/sync-client-update.sh" --publish
 
 echo "Published:"
-ls -lh "$OUT/DeskForce.exe" "$OUT/DeskForce-Windows-paper-brass.zip"
+ls -lh "$OUT/DeskForce.exe" "$OUT/DeskForce-Windows-paper-brass.zip" ${SETUP:+"$OUT/DeskForce-Setup.exe"}
 echo "Done. Run=$RUN_ID bytes exe=$EXE_BYTES zip=$ZIP_BYTES"

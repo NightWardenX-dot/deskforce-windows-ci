@@ -11,7 +11,7 @@ env:
   VCPKG_COMMIT_ID: "120deac3062162151622ca4860575a33844ba10b"
   VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
   OEM_APP_NAME: DeskForce
-  OEM_APP_VERSION: "1.2.5"
+  OEM_APP_VERSION: "1.2.6"
   OEM_ID_SERVER: "78.29.49.98"
   OEM_RELAY_SERVER: "78.29.49.98"
   OEM_API_SERVER: "https://deskforce.dr6ter.ru"
@@ -75,8 +75,8 @@ jobs:
 
           grep -q "deskforce" rustdesk/libs/portable/src/main.rs
 
-          grep -q 'version = "1.2.5"' rustdesk/Cargo.toml
-          grep -q 'ProductVersion = "1.2.5"' rustdesk/libs/portable/Cargo.toml
+          grep -q 'version = "1.2.6"' rustdesk/Cargo.toml
+          grep -q 'ProductVersion = "1.2.6"' rustdesk/libs/portable/Cargo.toml
           grep -q 'DESKFORCE_OEM_VERSION_BEGIN' rustdesk/flutter/windows/runner/Runner.rc
           grep -q 'webview_windows' rustdesk/flutter/pubspec.yaml
           grep -q '78.29.49.98' rustdesk/libs/hbb_common/src/config.rs
@@ -108,6 +108,9 @@ jobs:
           # Lightweight Dart syntax gate before expensive FFI/build_runner
           python3 -c "from pathlib import Path; import re; t=Path('rustdesk/flutter/lib/mobile/pages/connection_page.dart').read_text(encoding='utf-8'); assert 'RawAutocomplete<' not in t and '_allPeersLoader' not in t; s=re.sub(r'//.*?$','',t,flags=re.M); s=re.sub(r'/\*.*?\*/','',s,flags=re.S); assert s.count('(')==s.count(')') and s.count('{')==s.count('}') and s.count('[')==s.count(']'); print('mobile connection_page.dart syntax OK')"
           grep -q "dfApplyStartupWindowBehavior" rustdesk/flutter/lib/main.dart
+          grep -q "dfEnsureNativeTray" rustdesk/flutter/lib/common/deskforce_startup.dart
+          grep -q "DeskForce Tray.lnk" rustdesk/flutter/lib/common/deskforce_startup.dart
+          grep -q "Start-DeskForceWithTray" rustdesk/flutter/lib/common/deskforce_update.dart
           grep -q "Автозапуск" rustdesk/flutter/lib/desktop/pages/deskforce_settings_page.dart
           grep -q "Полноэкранный режим при запуске" rustdesk/flutter/lib/desktop/pages/deskforce_settings_page.dart
           grep -q "Проверить обновления" rustdesk/flutter/lib/desktop/pages/deskforce_settings_page.dart
@@ -115,6 +118,9 @@ jobs:
           ! grep -q "_nav()" rustdesk/flutter/lib/desktop/pages/deskforce_settings_page.dart
           grep -q "hide-help-cards" rustdesk/src/common.rs
           grep -q "disable-installation" rustdesk/src/common.rs
+          grep -q "patch_core_main_tray" deskforce/oem/apply_branding.py
+          grep -q "DeskForce OEM: always ensure native tray" deskforce/oem/apply_branding.py
+          test -f deskforce/oem/installer/deskforce.iss
           grep -q "df-start-fullscreen" rustdesk/src/common.rs
           # Stopped-service UI must not show stock install cards
           grep -q "return const SizedBox.shrink();" rustdesk/flutter/lib/desktop/pages/desktop_home_page.dart
@@ -275,10 +281,25 @@ jobs:
           echo "DeskForce.exe bytes=$SIZE"
           test "$SIZE" -gt 10000000
 
+      - name: Build DeskForce-Setup.exe (Inno Setup)
+        shell: bash
+        working-directory: rustdesk
+        run: |
+          set -e
+          choco install innosetup -y --no-progress
+          ISCC="/c/Program Files (x86)/Inno Setup 6/ISCC.exe"
+          test -f "$ISCC"
+          test -d deskforce-pack
+          "$ISCC" "$GITHUB_WORKSPACE/deskforce/oem/installer/deskforce.iss"             "/DMyAppVersion=${{ env.OEM_APP_VERSION }}"             "/DSourceDir=$PWD/deskforce-pack"             "/DOutputDir=$PWD/../out"
+          ls -lh ../out/DeskForce-Setup.exe
+          SETUP_BYTES=$(wc -c < ../out/DeskForce-Setup.exe)
+          test "$SETUP_BYTES" -gt 10000000
+
       - uses: actions/upload-artifact@v4
         with:
           name: DeskForce-Windows-paper-brass
           path: |
             out/DeskForce.exe
             out/DeskForce-Windows-paper-brass.zip
+            out/DeskForce-Setup.exe
           if-no-files-found: error

@@ -44,37 +44,78 @@ String get _startupShortcutPath {
   return '$appData\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\DeskForce.lnk';
 }
 
-/// Create/remove a per-user Startup shortcut to this DeskForce.exe.
-Future<bool> dfSetWindowsAutostart(bool enable) async {
-  if (!Platform.isWindows) return false;
-  final exe = Platform.resolvedExecutable;
-  final lnk = _startupShortcutPath;
+String get _trayStartupShortcutPath {
+  final appData = Platform.environment['APPDATA'] ?? '';
+  return '$appData\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\DeskForce Tray.lnk';
+}
+
+/// Spawn native `--tray` process (notification area icon). Idempotent via Rust check_process.
+Future<void> dfEnsureNativeTray() async {
+  if (!Platform.isWindows) return;
   try {
-    if (!enable) {
-      final f = File(lnk);
-      if (await f.exists()) await f.delete();
-      await dfSetLocalBool(kDfAutostart, false);
-      return true;
-    }
-    final dir = Directory(lnk).parent;
-    if (!await dir.exists()) await dir.create(recursive: true);
-    final workDir = File(exe).parent.path.replaceAll("'", "''");
-    // Keep PowerShell vars as real $ — written literally below via r-string segment.
-    final ps = r"""
+    final exe = Platform.resolvedExecutable;
+    await Process.start(
+      exe,
+      ['--tray'],
+      mode: ProcessStartMode.detached,
+      runInShell: true,
+    );
+  } catch (e) {
+    debugPrint('native tray spawn failed: $e');
+  }
+}
+
+Future<bool> _createWindowsShortcut(
+  String lnk,
+  String exe, {
+  String arguments = '',
+  String description = 'DeskForce',
+}) async {
+  final dir = Directory(lnk).parent;
+  if (!await dir.exists()) await dir.create(recursive: true);
+  final workDir = File(exe).parent.path.replaceAll("'", "''");
+  final desc = description.replaceAll("'", "''");
+  final argsPs = arguments.isEmpty
+      ? ''
+      : "\n\$s.Arguments = '${arguments.replaceAll("'", "''")}'";
+  final ps = r"""
 $ws = New-Object -ComObject WScript.Shell
 $s = $ws.CreateShortcut('""" + lnk + r"""')
 $s.TargetPath = '""" + exe + r"""'
 $s.WorkingDirectory = '""" + workDir + r"""'
-$s.Description = 'DeskForce'
+$s.Description = '""" + desc + r"""'""" + argsPs + r"""
 $s.Save()
 """;
-    final r = await Process.run(
-      'powershell',
-      ['-NoProfile', '-NonInteractive', '-Command', ps],
-      runInShell: true,
+  final r = await Process.run(
+    'powershell',
+    ['-NoProfile', '-NonInteractive', '-Command', ps],
+    runInShell: true,
+  );
+  return r.exitCode == 0;
+}
+
+/// Create/remove per-user Startup shortcuts (main app + native tray).
+Future<bool> dfSetWindowsAutostart(bool enable) async {
+  if (!Platform.isWindows) return false;
+  final exe = Platform.resolvedExecutable;
+  try {
+    if (!enable) {
+      for (final path in [_startupShortcutPath, _trayStartupShortcutPath]) {
+        final f = File(path);
+        if (await f.exists()) await f.delete();
+      }
+      await dfSetLocalBool(kDfAutostart, false);
+      return true;
+    }
+    final okMain = await _createWindowsShortcut(_startupShortcutPath, exe);
+    final okTray = await _createWindowsShortcut(
+      _trayStartupShortcutPath,
+      exe,
+      arguments: '--tray',
+      description: 'DeskForce (трей)',
     );
-    if (r.exitCode != 0) {
-      debugPrint('autostart failed: ${r.stderr}');
+    if (!okMain || !okTray) {
+      debugPrint('autostart shortcut failed main=$okMain tray=$okTray');
       return false;
     }
     await dfSetLocalBool(kDfAutostart, true);
@@ -88,7 +129,8 @@ $s.Save()
 Future<bool> dfIsWindowsAutostartEnabled() async {
   if (!Platform.isWindows) return false;
   try {
-    return await File(_startupShortcutPath).exists();
+    return await File(_startupShortcutPath).exists() ||
+        await File(_trayStartupShortcutPath).exists();
   } catch (_) {
     return dfLocalBool(kDfAutostart);
   }
@@ -162,6 +204,9 @@ Future<void> _fitWorkArea(Size work) async {
 
 Future<void> _applyStartupWindowBehaviorImpl({required bool force}) async {
   try {
+    if (Platform.isWindows) {
+      await dfEnsureNativeTray();
+    }
     final work = await _workAreaSize();
     await _applySafeMinSize(work);
 

@@ -109,7 +109,7 @@ class _DeskForceSettingsPageState extends State<DeskForceSettingsPage> {
             _toggle(
               title: 'Запуск в трее',
               subtitle:
-                  'Скрывать главное окно при старте (остаётся в системном трее)',
+                  'Скрывать главное окно при старте; иконка DeskForce в области уведомлений',
               value: _startTray,
               onChanged: (v) async {
                 await dfSetLocalBool(kDfStartInTray, v);

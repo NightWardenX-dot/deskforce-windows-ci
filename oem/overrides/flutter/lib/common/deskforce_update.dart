@@ -536,6 +536,13 @@ function Wait-DeskForceGone {
   return \$false
 }
 
+function Start-DeskForceWithTray {
+  param([string]\$ExePath)
+  Start-Process -FilePath \$ExePath
+  Start-Sleep -Milliseconds 500
+  Start-Process -FilePath \$ExePath -ArgumentList '--tray' -ErrorAction SilentlyContinue
+}
+
 function Copy-WithRetry {
   param([string]\$Src, [string]\$Dest, [int]\$Attempts = 120)
   for (\$i = 0; \$i -lt \$Attempts; \$i++) {
@@ -643,7 +650,7 @@ for (\$i = 0; \$i -lt 80; \$i++) {
   try {
     Copy-Item -Path (Join-Path \$payload '*') -Destination \$dest -Recurse -Force -ErrorAction Stop
     Start-Sleep -Milliseconds 250
-    Start-Process -FilePath \$exe
+    Start-DeskForceWithTray -ExePath \$exe
     exit 0
   } catch {
     Stop-DeskForceFamily
@@ -685,11 +692,11 @@ if (Copy-WithRetry -Src \$src -Dest \$dest) {
     Remove-Item -Path \$extract -Recurse -Force -ErrorAction SilentlyContinue
   }
   Start-Sleep -Milliseconds 300
-  Start-Process -FilePath \$dest
+  Start-DeskForceWithTray -ExePath \$dest
   exit 0
 }
 Schedule-RebootReplace -Src \$src -Dest \$dest
-Start-Process -FilePath \$dest -ErrorAction SilentlyContinue
+Start-DeskForceWithTray -ExePath \$dest
 exit 0
 ''';
   await File(scriptPath).writeAsString(ps, flush: true);
