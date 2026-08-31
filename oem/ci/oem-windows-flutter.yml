@@ -290,7 +290,11 @@ jobs:
           ISCC="/c/Program Files (x86)/Inno Setup 6/ISCC.exe"
           test -f "$ISCC"
           test -d deskforce-pack
-          "$ISCC" "$GITHUB_WORKSPACE/deskforce/oem/installer/deskforce.iss"             "/DMyAppVersion=${{ env.OEM_APP_VERSION }}"             "/DSourceDir=$PWD/deskforce-pack"             "/DOutputDir=$PWD/../out"
+          ISS="$(cygpath -w "$GITHUB_WORKSPACE/deskforce/oem/installer/deskforce.iss")"
+          SOURCE_DIR="$(cygpath -w "$PWD/deskforce-pack")"
+          OUTPUT_DIR="$(cygpath -w "$PWD/../out")"
+          test -f "$ISS"
+          "$ISCC" "$ISS" "/DMyAppVersion=${{ env.OEM_APP_VERSION }}" "/DSourceDir=${SOURCE_DIR}" "/DOutputDir=${OUTPUT_DIR}"
           ls -lh ../out/DeskForce-Setup.exe
           SETUP_BYTES=$(wc -c < ../out/DeskForce-Setup.exe)
           test "$SETUP_BYTES" -gt 10000000
