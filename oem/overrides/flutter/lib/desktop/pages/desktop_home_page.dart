@@ -79,7 +79,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
               child: ValueListenableBuilder<DeskForceUpdateBannerData?>(
                 valueListenable: dfUpdateBannerNotifier,
                 builder: (context, _, __) => LayoutBuilder(
-                builder: (context, constraints) {
+                  builder: (context, constraints) {
                   // Zero/non-finite width happens for a frame while HWND sizes —
                   // prefer wide to avoid a narrow→wide layout flip on open.
                   final mw = constraints.maxWidth;
@@ -183,9 +183,9 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                       child: body,
                     ),
                   );
-                },
+                  },
+                ),
               ),
-            ),
             ),
             Positioned(
               top: 0,
