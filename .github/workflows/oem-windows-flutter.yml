@@ -95,7 +95,7 @@ jobs:
           grep -q 'DfCabinetSession' rustdesk/flutter/lib/desktop/pages/desktop_home_page.dart
           test -f rustdesk/flutter/lib/desktop/pages/cabinet/cabinet_session.dart
           grep -qE "^[[:space:]]*crypto:" rustdesk/flutter/pubspec.yaml
-          grep -q 'deskforce_hub_page.dart' rustdesk/flutter/lib/desktop/pages/deskforce_hub_page.dart
+          grep -q 'openDeskForceHub' rustdesk/flutter/lib/desktop/pages/deskforce_hub_page.dart
 
           test -f rustdesk/flutter/lib/desktop/pages/deskforce_settings_page.dart
           test -f rustdesk/flutter/lib/common/deskforce_startup.dart
