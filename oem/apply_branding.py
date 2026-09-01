@@ -1162,6 +1162,19 @@ def normalize_semver(version: str) -> str:
     return core_norm
 
 
+
+def android_pubspec_build_number(version: str) -> str:
+    """Flutter pubspec +build becomes Android versionCode (RuStore requires monotonic)."""
+    explicit = env("OEM_ANDROID_VERSION_CODE")
+    if explicit:
+        if not re.fullmatch(r"[0-9]+", explicit):
+            print(f"WARN: OEM_ANDROID_VERSION_CODE invalid: {explicit!r}", file=sys.stderr)
+        else:
+            return explicit
+    # Legacy DeskForce sideload builds used +1 here (versionCode 1); RuStore uploads need explicit codes.
+    return "2002"
+
+
 def windows_file_version_numeric(version: str) -> str:
     """Map semver to FILEVERSION tuple (prerelease is not numeric on Windows)."""
     core = normalize_semver(version).split("-")[0].split("+")[0]
@@ -1266,10 +1279,11 @@ def patch_version(src: pathlib.Path, version: str = "1.0") -> None:
     pubspec = src / "flutter" / "pubspec.yaml"
     if pubspec.is_file():
         text = pubspec.read_text(encoding="utf-8", errors="ignore")
-        text2 = re.sub(r'(?m)^version: .*', f'version: {semver}+1', text, count=1)
+        build_no = android_pubspec_build_number(semver)
+        text2 = re.sub(r'(?m)^version: .*', f'version: {semver}+{build_no}', text, count=1)
         if text2 != text:
             pubspec.write_text(text2, encoding="utf-8")
-            print(f"Patched: pubspec.yaml version={semver}+1")
+            print(f"Patched: pubspec.yaml version={semver}+{build_no} (android versionCode)")
     # Ensure generated version.rs if present (build will regenerate)
     ver_rs = src / "src" / "version.rs"
     if ver_rs.is_file():
