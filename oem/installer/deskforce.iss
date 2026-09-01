@@ -2,7 +2,7 @@
 ; CI passes /DMyAppVersion=x.y.z /DSourceDir=path /DOutputDir=path
 
 #ifndef MyAppVersion
-  #define MyAppVersion "1.2.6"
+  #define MyAppVersion "1.2.8"
 #endif
 #ifndef SourceDir
   #define SourceDir "..\deskforce-pack"

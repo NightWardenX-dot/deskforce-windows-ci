@@ -17,6 +17,87 @@ const kDfUpdateApiUrl = 'https://$kDfUpdateHost/api/client/update';
 
 const kDfUpdateChannelKey = 'df-update-channel';
 const kDfUpdateTestBuildsKey = 'df-test-builds';
+const kDfPackerExeKey = 'df-packer-exe';
+
+Future<void> dfRememberPackerExeForUpdate() async {
+  if (!Platform.isWindows) return;
+  final fromEnv = Platform.environment['DESKFORCE_PACKER_EXE']?.trim();
+  if (fromEnv == null || fromEnv.isEmpty || !File(fromEnv).existsSync()) return;
+  try {
+    await bind.mainSetLocalOption(key: kDfPackerExeKey, value: fromEnv);
+  } catch (_) {}
+}
+
+bool _windowsPathLooksLikeExtractCache(String exePath) {
+  final lower = exePath.replaceAll('/', '\\').toLowerCase();
+  return lower.contains('\\deskforce\\') ||
+      lower.endsWith('\\deskforce\\deskforce.exe');
+}
+
+bool _windowsPathLooksLikeInstalledDir(String exePath) {
+  final lower = exePath.replaceAll('/', '\\').toLowerCase();
+  if (lower.contains('\\program files\\deskforce\\')) return true;
+  if (lower.contains('\\program files (x86)\\deskforce\\')) return true;
+  try {
+    if (bind.mainIsInstalled()) return true;
+  } catch (_) {}
+  return false;
+}
+
+Future<String?> _windowsSavedPackerExe() async {
+  try {
+    final saved = (await bind.mainGetLocalOption(key: kDfPackerExeKey)).trim();
+    if (saved.isNotEmpty && File(saved).existsSync()) return saved;
+  } catch (_) {}
+  return null;
+}
+
+Future<String?> _windowsFindPackerViaPowerShell() async {
+  if (!Platform.isWindows) return null;
+  const ps = r"""
+$cache = Join-Path $env:LOCALAPPDATA 'deskforce'
+Get-CimInstance Win32_Process -Filter "Name='DeskForce.exe'" -ErrorAction SilentlyContinue |
+  ForEach-Object { $_.ExecutablePath } |
+  Where-Object { $_ -and (Test-Path $_) -and ($_.ToLower() -notlike ($cache.ToLower() + '*')) } |
+  Select-Object -First 1
+""";
+  try {
+    final r = await Process.run(
+      'powershell',
+      ['-NoProfile', '-NonInteractive', '-Command', ps],
+      runInShell: true,
+    );
+    final out = '${r.stdout}'.trim();
+    if (out.isNotEmpty && File(out).existsSync()) return out;
+  } catch (_) {}
+  return null;
+}
+
+Future<String?> _windowsResolvePackerExe() async {
+  final fromEnv = _windowsPackerExePath();
+  if (fromEnv != null) {
+    await dfRememberPackerExeForUpdate();
+    return fromEnv;
+  }
+  final saved = await _windowsSavedPackerExe();
+  if (saved != null) return saved;
+  return _windowsFindPackerViaPowerShell();
+}
+
+String _windowsDefaultInstalledExe() {
+  final pf = Platform.environment['ProgramFiles']?.trim();
+  if (pf != null && pf.isNotEmpty) {
+    final exe = p.join(pf, 'DeskForce', 'DeskForce.exe');
+    if (File(exe).existsSync()) return exe;
+  }
+  final pf86 = Platform.environment['ProgramFiles(x86)']?.trim();
+  if (pf86 != null && pf86.isNotEmpty) {
+    final exe = p.join(pf86, 'DeskForce', 'DeskForce.exe');
+    if (File(exe).existsSync()) return exe;
+  }
+  return p.join(r'C:\Program Files', 'DeskForce', 'DeskForce.exe');
+}
+
 
 /// release (default), beta, alpha — see downloads/update-*.json on server.
 const kDfUpdateChannels = ['release', 'beta', 'alpha'];
@@ -214,6 +295,7 @@ class DeskForceUpdateInfo {
     required this.releaseNotes,
     required this.available,
     this.archiveUrl = '',
+    this.setupUrl = '',
     this.updateAvailable,
   });
 
@@ -224,16 +306,26 @@ class DeskForceUpdateInfo {
   final String releaseNotes;
   final bool available;
   final String archiveUrl;
+  final String setupUrl;
   /// Server-side compare result when client sent ?version= (null = unknown).
   final bool? updateAvailable;
 
   bool get hasDownload =>
-      available && (_isAllowedUrl(downloadUrl) || _isAllowedUrl(archiveUrl));
+      available &&
+      (_isAllowedUrl(downloadUrl) ||
+          _isAllowedUrl(archiveUrl) ||
+          _isAllowedUrl(setupUrl));
 
   String get preferredDownloadUrl {
+    if (Platform.isWindows &&
+        _isAllowedUrl(setupUrl) &&
+        _windowsPathLooksLikeInstalledDir(Platform.resolvedExecutable)) {
+      return setupUrl;
+    }
     // Prefer the single-file Windows portable (DeskForce.exe). Zip+folder replace
     // is only used when the client is already running from an unpacked bundle.
     if (_isAllowedUrl(downloadUrl)) return downloadUrl;
+    if (_isAllowedUrl(setupUrl)) return setupUrl;
     if (_isAllowedUrl(archiveUrl)) return archiveUrl;
     return '';
   }
@@ -362,13 +454,15 @@ DeskForceUpdateInfo? _parsePlatform(Map<String, dynamic> map, String plat) {
   if (version.isEmpty) return null;
   var url = '${map['download_url'] ?? ''}'.trim();
   var archiveUrl = '';
+  var setupUrl = '';
   final urls = map['download_urls'];
   if (urls is Map) {
     if (plat == 'windows') {
       archiveUrl = '${urls['zip'] ?? ''}'.trim();
+      setupUrl = '${urls['setup'] ?? ''}'.trim();
     }
     if (url.isEmpty) {
-      for (final key in ['exe', 'apk', 'deb', 'appimage', 'zip']) {
+      for (final key in ['exe', 'apk', 'deb', 'appimage', 'zip', 'setup']) {
         final v = '${urls[key] ?? ''}'.trim();
         if (v.isNotEmpty) {
           url = v;
@@ -384,6 +478,9 @@ DeskForceUpdateInfo? _parsePlatform(Map<String, dynamic> map, String plat) {
   if (archiveUrl.isNotEmpty && !_isAllowedUrl(archiveUrl)) {
     archiveUrl = '';
   }
+  if (setupUrl.isNotEmpty && !_isAllowedUrl(setupUrl)) {
+    setupUrl = '';
+  }
   bool? updateAvail;
   if (map.containsKey('update_available')) {
     updateAvail = map['update_available'] == true;
@@ -396,6 +493,7 @@ DeskForceUpdateInfo? _parsePlatform(Map<String, dynamic> map, String plat) {
     releaseNotes: '${map['release_notes'] ?? ''}'.trim(),
     available: map['available'] != false,
     archiveUrl: archiveUrl,
+    setupUrl: setupUrl,
     updateAvailable: updateAvail,
   );
 }
@@ -476,10 +574,7 @@ bool _windowsLooksLikeFolderBundle(String exePath) {
 }
 
 bool _windowsLooksLikePortableExtract(String exePath) {
-  final lower = exePath.replaceAll('/', '\\').toLowerCase();
-  if (lower.contains('\\deskforce\\')) {
-    return true;
-  }
+  if (_windowsPathLooksLikeExtractCache(exePath)) return true;
   final packerExe = Platform.environment['DESKFORCE_PACKER_EXE'];
   if (packerExe != null && packerExe.trim().isNotEmpty) return true;
   return false;
@@ -569,6 +664,37 @@ public class DfMoveFileEx {
   [void][DfMoveFileEx]::MoveFileEx(\$Src, \$Dest, 4)
 }
 
+function Find-DeskForcePacker {
+  param([string]\$Hint = '')
+  if (\$Hint -and (Test-Path \$Hint)) { return \$Hint }
+  \$cache = Join-Path \$env:LOCALAPPDATA 'deskforce'
+  \$paths = @()
+  Get-CimInstance Win32_Process -Filter "Name='DeskForce.exe'" -ErrorAction SilentlyContinue |
+    ForEach-Object { \$_.ExecutablePath } |
+    Where-Object { \$_ -and (Test-Path \$_) -and (\$_.ToLower() -notlike (\$cache.ToLower() + '*')) } |
+    ForEach-Object { \$paths += \$_ }
+  if (\$paths.Count -gt 0) { return \$paths[0] }
+  foreach (\$guess in @(
+    (Join-Path \$env:USERPROFILE 'Downloads\\DeskForce.exe'),
+    (Join-Path \$env:USERPROFILE 'Desktop\\DeskForce.exe')
+  )) {
+    if (Test-Path \$guess) { return \$guess }
+  }
+  return \$null
+}
+
+function Resolve-InstalledExe {
+  param([string]\$Hint = '')
+  if (\$Hint -and (Test-Path \$Hint)) { return \$Hint }
+  foreach (\$guess in @(
+    (Join-Path \$env:ProgramFiles 'DeskForce\\DeskForce.exe'),
+    (Join-Path \${env:ProgramFiles(x86)} 'DeskForce\\DeskForce.exe')
+  )) {
+    if (Test-Path \$guess) { return \$guess }
+  }
+  return \$null
+}
+
 Wait-ParentExit -Pid \$ParentPid
 Stop-DeskForceFamily
 if (-not (Wait-DeskForceGone)) {
@@ -590,11 +716,12 @@ Future<void> _windowsStopSiblingProcesses() async {
 }
 
 
-String? _windowsUpdateTargetExe(String currentExe, String? packer) {
+Future<String?> _windowsUpdateTargetExe(String currentExe, String? packer) async {
   if (packer != null && packer.isNotEmpty && File(packer).existsSync()) return packer;
-  if (!_windowsLooksLikePortableExtract(currentExe) &&
-      currentExe.toLowerCase().endsWith('.exe') &&
-      File(currentExe).existsSync()) {
+  if (_windowsLooksLikePortableExtract(currentExe)) {
+    return _windowsResolvePackerExe();
+  }
+  if (currentExe.toLowerCase().endsWith('.exe') && File(currentExe).existsSync()) {
     return currentExe;
   }
   return null;
@@ -608,6 +735,44 @@ String _windowsExtractCacheDir(String resolvedExe) {
   return File(resolvedExe).parent.path;
 }
 
+Future<bool> _startWindowsUpdaterScript(String scriptPath, String ps) async {
+  await File(scriptPath).writeAsString(ps, flush: true);
+  await Process.start(
+    'powershell',
+    ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', scriptPath],
+    mode: ProcessStartMode.detached,
+  );
+  return true;
+}
+
+Future<bool> _applyWindowsSetupUpdate(
+  DeskForceUpdateInfo info,
+  String setupUrl,
+  String scriptPath,
+  int parentPid,
+) async {
+  final tempDir = await getTemporaryDirectory();
+  final stamp = DateTime.now().millisecondsSinceEpoch;
+  final setupPath = p.join(tempDir.path, 'deskforce-setup-$stamp.exe');
+  await _downloadToFile(Uri.parse(setupUrl), setupPath);
+  await _windowsStopSiblingProcesses();
+  final installHint = _windowsDefaultInstalledExe();
+  final ps = '''
+${_windowsUpdaterScriptHeader(parentPid: parentPid)}
+\$setup = '${_psQuote(setupPath)}'
+\$installExe = '${_psQuote(installHint)}'
+\$proc = Start-Process -FilePath \$setup -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/CLOSEAPPLICATIONS','/SP-' -PassThru -Wait
+if (\$proc.ExitCode -ne 0) { throw "setup_exit_\$(\$proc.ExitCode)" }
+Stop-DeskForceFamily
+if (-not (Wait-DeskForceGone)) { throw 'processes_still_running' }
+\$exe = Resolve-InstalledExe -Hint \$installExe
+if (-not \$exe) { throw 'install_exe_missing' }
+Start-DeskForceWithTray -ExePath \$exe
+exit 0
+''';
+  return _startWindowsUpdaterScript(scriptPath, ps);
+}
+
 /// Returns true when a detached updater was started and the app should exit.
 Future<bool> _applyWindowsUpdate(DeskForceUpdateInfo info) async {
   final currentExe = Platform.resolvedExecutable;
@@ -616,9 +781,17 @@ Future<bool> _applyWindowsUpdate(DeskForceUpdateInfo info) async {
   final scriptPath = p.join(tempDir.path, 'deskforce-update-$stamp.ps1');
   final parentPid = pid;
 
-  final packer = _windowsPackerExePath();
+  final packer = await _windowsResolvePackerExe();
   final portable = _windowsLooksLikePortableExtract(currentExe);
+  final installed = _windowsPathLooksLikeInstalledDir(currentExe);
   final folder = _windowsLooksLikeFolderBundle(currentExe) && !portable;
+
+  final setupUrl = _isAllowedUrl(info.setupUrl)
+      ? info.setupUrl
+      : (info.downloadUrl.toLowerCase().contains('-setup.exe') ? info.downloadUrl : '');
+  if (installed && _isAllowedUrl(setupUrl)) {
+    return _applyWindowsSetupUpdate(info, setupUrl, scriptPath, parentPid);
+  }
 
   if (folder && _isAllowedUrl(info.archiveUrl)) {
     final zipPath = p.join(tempDir.path, 'deskforce-update-$stamp.zip');
@@ -656,33 +829,28 @@ for (\$i = 0; \$i -lt 80; \$i++) {
 }
 throw 'copy_failed'
 ''';
-    await File(scriptPath).writeAsString(ps, flush: true);
-    await Process.start(
-      'powershell',
-      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', scriptPath],
-      mode: ProcessStartMode.detached,
-    );
-    return true;
+    return _startWindowsUpdaterScript(scriptPath, ps);
   }
 
-  final exeUrl = _isAllowedUrl(info.downloadUrl)
+  final exeUrl = _isAllowedUrl(info.downloadUrl) &&
+          info.downloadUrl.toLowerCase().endsWith('.exe') &&
+          !info.downloadUrl.toLowerCase().contains('-setup.exe')
       ? info.downloadUrl
-      : info.preferredDownloadUrl;
-  if (!_isAllowedUrl(exeUrl) || !exeUrl.toLowerCase().endsWith('.exe')) {
+      : '';
+  if (!_isAllowedUrl(exeUrl)) {
     return false;
   }
-  final targetExe = _windowsUpdateTargetExe(currentExe, packer);
-  if (targetExe == null) {
-    return false;
-  }
+  final targetExe = await _windowsUpdateTargetExe(currentExe, packer);
   final newExePath = p.join(tempDir.path, 'deskforce-update-$stamp.exe');
   await _downloadToFile(Uri.parse(exeUrl), newExePath);
   final extractDir = _windowsExtractCacheDir(currentExe);
   await _windowsStopSiblingProcesses();
+  final destHint = targetExe ?? '';
   final ps = '''
 ${_windowsUpdaterScriptHeader(parentPid: parentPid)}
 \$src = '${_psQuote(newExePath)}'
-\$dest = '${_psQuote(targetExe)}'
+\$dest = Find-DeskForcePacker -Hint '${_psQuote(destHint)}'
+if (-not \$dest) { throw 'packer_not_found' }
 \$extract = '${_psQuote(extractDir)}'
 if (Copy-WithRetry -Src \$src -Dest \$dest) {
   if (Test-Path \$extract) {
@@ -696,13 +864,7 @@ Schedule-RebootReplace -Src \$src -Dest \$dest
 Start-DeskForceWithTray -ExePath \$dest
 exit 0
 ''';
-  await File(scriptPath).writeAsString(ps, flush: true);
-  await Process.start(
-    'powershell',
-    ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', scriptPath],
-    mode: ProcessStartMode.detached,
-  );
-  return true;
+  return _startWindowsUpdaterScript(scriptPath, ps);
 }
 
 Future<void> dfDownloadAndExecute(BuildContext context, DeskForceUpdateInfo info) async {
@@ -722,7 +884,7 @@ Future<void> dfDownloadAndExecute(BuildContext context, DeskForceUpdateInfo info
       if (context.mounted) {
         await _toast(
           context,
-          'Автоустановка недоступна в этой сборке. Скачайте DeskForce.exe вручную и замените файл.',
+          'Не удалось запустить автообновление. Откроем загрузку — установите DeskForce-Setup.exe или замените DeskForce.exe.',
         );
         await launchUrl(Uri.parse(preferredUrl), mode: LaunchMode.externalApplication);
       }

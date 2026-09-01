@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
+import 'package:flutter_hbb/common/deskforce_update.dart';
 import 'package:flutter_hbb/models/state_model.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:window_size/window_size.dart' as window_size;
@@ -205,6 +206,7 @@ Future<void> _fitWorkArea(Size work) async {
 Future<void> _applyStartupWindowBehaviorImpl({required bool force}) async {
   try {
     if (Platform.isWindows) {
+      await dfRememberPackerExeForUpdate();
       await dfEnsureNativeTray();
     }
     final work = await _workAreaSize();
