@@ -243,7 +243,14 @@ jobs:
             grep -E "application-label:'DeskForce'|application: .*label='DeskForce'" ../out/badging.txt
             grep -E "name='ru.deskforce.ud'|name='com.carriez.flutter_hbb'" ../out/badging.txt
             grep -q "versionName='1.2.8'" ../out/badging.txt
-            grep -q "versionCode='2002'" ../out/badging.txt
+            python3 - <<'PY'
+import re, pathlib
+t = pathlib.Path("../out/badging.txt").read_text()
+m = re.search(r"versionCode='(\d+)'", t)
+vc = int(m.group(1)) if m else 0
+assert vc > 2001, f"versionCode {vc} must exceed RuStore previous 2001"
+print(f"OK android versionCode={vc}")
+PY
           fi
           unzip -p ../out/DeskForce.apk assets/flutter_assets/assets/icon.png > ../out/apk-icon.png
           python3 - <<'PY'
