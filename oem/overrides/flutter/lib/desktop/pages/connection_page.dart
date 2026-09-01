@@ -18,7 +18,7 @@ import '../../models/peer_model.dart';
 import '../../desktop/widgets/material_mod_popup_menu.dart' as mod_menu;
 import 'package:flutter_hbb/desktop/pages/deskforce_peer_lists.dart';
 
-/// DeskForce paper/brass server status — not the classic RustDesk green/red dot.
+/// DeskForce paper/brass server status — not the stock green/red status dot.
 class OnlineStatusWidget extends StatefulWidget {
   const OnlineStatusWidget({Key? key, this.onSvcStatusChanged})
       : super(key: key);

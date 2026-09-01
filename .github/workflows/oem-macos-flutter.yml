@@ -13,7 +13,7 @@ env:
   VCPKG_COMMIT_ID: "120deac3062162151622ca4860575a33844ba10b"
   VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
   OEM_APP_NAME: DeskForce
-  OEM_APP_VERSION: "1.2.6"
+  OEM_APP_VERSION: "1.2.7"
   OEM_ID_SERVER: "78.29.49.98"
   OEM_RELAY_SERVER: "78.29.49.98"
   OEM_API_SERVER: "https://deskforce.dr6ter.ru"
@@ -80,7 +80,7 @@ jobs:
           grep -q "DeskForce" rustdesk/libs/hbb_common/src/config.rs
           grep -q "78.29.49.98" rustdesk/libs/hbb_common/src/config.rs
           ! grep -q "rs-ny.rustdesk.com" rustdesk/libs/hbb_common/src/config.rs
-          grep -q 'version = "1.2.6"' rustdesk/Cargo.toml
+          grep -q 'version = "1.2.7"' rustdesk/Cargo.toml
           grep -q "2DD4BF" rustdesk/flutter/lib/common.dart
 
       - name: Install build runtime

@@ -235,7 +235,7 @@ class DfCabinetSession extends GetxController {
         // ignore: unawaited_futures
         claimLocalDevice(quiet: true);
       }
-      await _syncRustdeskAbAuth(active: true);
+      await _syncClientAbAuth(active: true);
     } catch (e) {
       debugPrint('DfCabinetSession.refresh: $e');
       lastError.value = e.toString();
@@ -258,7 +258,7 @@ class DfCabinetSession extends GetxController {
     _clear();
   }
 
-  /// Bind this PC's RustDesk ID to the cabinet account.
+  /// Bind this PC's device ID to the cabinet account.
   Future<bool> claimLocalDevice({bool quiet = false}) async {
     if (!CabinetApi.instance.isLoggedIn) return false;
     final id = _readLocalId();
@@ -295,9 +295,9 @@ class DfCabinetSession extends GetxController {
   }
 
 
-  /// Sync cabinet JWT into RustDesk `access_token` / `user_info` so /api/ab works
+  /// Sync cabinet JWT into client `access_token` / `user_info` so /api/ab works
   /// while stock Account UI stays disabled (disable-account).
-  Future<void> _syncRustdeskAbAuth({required bool active}) async {
+  Future<void> _syncClientAbAuth({required bool active}) async {
     try {
       if (!active) {
         await bind.mainSetLocalOption(key: 'access_token', value: '');
@@ -338,7 +338,7 @@ class DfCabinetSession extends GetxController {
         debugPrint('ab pull after cabinet login: $e');
       }
     } catch (e) {
-      debugPrint('_syncRustdeskAbAuth: $e');
+      debugPrint('_syncClientAbAuth: $e');
     }
   }
 
@@ -367,7 +367,7 @@ class DfCabinetSession extends GetxController {
   void _clear() {
     // Full logout: drop AB bridge + UI. Used by logout / 401 only.
     // ignore: unawaited_futures
-    _syncRustdeskAbAuth(active: false);
+    _syncClientAbAuth(active: false);
     _clearUiState();
   }
 }

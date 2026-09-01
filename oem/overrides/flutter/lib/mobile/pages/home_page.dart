@@ -4,10 +4,10 @@ import 'package:flutter_hbb/mobile/pages/settings_page.dart';
 import 'package:flutter_hbb/web/settings_page.dart';
 import 'package:get/get.dart';
 import '../../common.dart';
-import '../../common/widgets/chat_page.dart';
 import '../../models/platform_model.dart';
 import '../../models/state_model.dart';
 import 'connection_page.dart';
+import 'mobile_cabinet_chat_page.dart';
 
 abstract class PageShape extends Widget {
   final String title = "";
@@ -55,9 +55,20 @@ class HomePageState extends State<HomePage> {
     }
     if (isAndroid && !bind.isOutgoingOnly()) {
       _chatPageTabIndex = _pages.length;
-      _pages.addAll([ChatPage(type: ChatPageType.mobileMain), ServerPage()]);
+      _pages.addAll([MobileCabinetChatPage(), ServerPage()]);
     }
     _pages.add(SettingsPage());
+  }
+
+  Widget _themedBody(int index) {
+    final page = _pages[index];
+    if (isAndroid && index == _chatPageTabIndex) {
+      return page;
+    }
+    return Theme(
+      data: MyTheme.lightTheme,
+      child: page,
+    );
   }
 
   @override
@@ -97,43 +108,14 @@ class HomePageState extends State<HomePage> {
             onTap: (index) => setState(() {
               if (_selectedIndex != index) {
                 _selectedIndex = index;
-                if (isChatPageCurrentTab) {
-                  gFFI.chatModel.hideChatIconOverlay();
-                  gFFI.chatModel.hideChatWindowOverlay();
-                  gFFI.chatModel.mobileClearClientUnread(
-                      gFFI.chatModel.currentKey.connId);
-                }
               }
             }),
           ),
-          body: _pages.elementAt(_selectedIndex),
+          body: _themedBody(_selectedIndex),
         ));
   }
 
   Widget appTitle() {
-    final currentUser = gFFI.chatModel.currentUser;
-    final currentKey = gFFI.chatModel.currentKey;
-    if (isChatPageCurrentTab &&
-        currentUser != null &&
-        currentKey.peerId.isNotEmpty) {
-      final connected =
-          gFFI.serverModel.clients.any((e) => e.id == currentKey.connId);
-      return Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Tooltip(
-            message: currentKey.peerId,
-            child: Text(
-              "${currentUser.firstName} ${currentUser.lastName}",
-              style: const TextStyle(color: _ink, fontWeight: FontWeight.w600),
-            ),
-          ),
-          if (connected)
-            const Icon(Icons.circle, color: Color(0xFF2F6B4F), size: 10)
-                .marginOnly(left: 6),
-        ],
-      );
-    }
     return const Text(
       'DeskForce',
       style: TextStyle(

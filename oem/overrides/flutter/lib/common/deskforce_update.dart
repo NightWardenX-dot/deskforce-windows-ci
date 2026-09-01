@@ -256,7 +256,7 @@ String dfNormalizeVersion(String v) {
   return parts.take(3).join('.');
 }
 
-/// Core numeric (RustDesk-style) for major.minor.patch only — ignores prerelease.
+/// Core numeric semver for major.minor.patch only — ignores prerelease.
 int dfVersionNumber(String v) {
   final main = dfNormalizeVersion(v);
   var n = 0;
@@ -477,11 +477,9 @@ bool _windowsLooksLikeFolderBundle(String exePath) {
 
 bool _windowsLooksLikePortableExtract(String exePath) {
   final lower = exePath.replaceAll('/', '\\').toLowerCase();
-  if (lower.contains('\\deskforce\\') || lower.contains('\\rustdesk\\')) {
+  if (lower.contains('\\deskforce\\')) {
     return true;
   }
-  final packerName = Platform.environment['RUSTDESK_APPNAME'];
-  if (packerName != null && packerName.trim().isNotEmpty) return true;
   final packerExe = Platform.environment['DESKFORCE_PACKER_EXE'];
   if (packerExe != null && packerExe.trim().isNotEmpty) return true;
   return false;
@@ -512,15 +510,15 @@ function Wait-ParentExit {
 
 function Stop-DeskForceFamily {
   param([int]\$ExcludePid = 0)
-  foreach (\$svc in @('DeskForce','rustdesk')) {
+  foreach (\$svc in @('DeskForce')) {
     & sc stop \$svc 2>\$null | Out-Null
   }
   Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
-    Where-Object { \$_.Name -in @('DeskForce.exe','rustdesk.exe') -and \$_.ProcessId -ne \$ExcludePid } |
+    Where-Object { \$_.Name -in @('DeskForce.exe') -and \$_.ProcessId -ne \$ExcludePid } |
     ForEach-Object {
       Stop-Process -Id \$_.ProcessId -Force -ErrorAction SilentlyContinue
     }
-  foreach (\$im in @('DeskForce.exe','rustdesk.exe')) {
+  foreach (\$im in @('DeskForce.exe')) {
     & taskkill /F /IM \$im /T 2>\$null | Out-Null
   }
 }
@@ -528,7 +526,7 @@ function Stop-DeskForceFamily {
 function Wait-DeskForceGone {
   param([int]\$MaxSec = 90)
   for (\$i = 0; \$i -lt \$MaxSec * 2; \$i++) {
-    \$alive = Get-Process -Name DeskForce,rustdesk -ErrorAction SilentlyContinue
+    \$alive = Get-Process -Name DeskForce -ErrorAction SilentlyContinue
     if (-not \$alive) { return \$true }
     Stop-DeskForceFamily
     Start-Sleep -Milliseconds 500
@@ -582,7 +580,6 @@ Future<void> _windowsStopSiblingProcesses() async {
   if (!Platform.isWindows) return;
   final myPid = pid;
   try {
-    await Process.run('taskkill', ['/F', '/IM', 'rustdesk.exe', '/T'], runInShell: true);
     await Process.run(
       'taskkill',
       ['/F', '/IM', 'DeskForce.exe', '/FI', 'PID ne $myPid', '/T'],

@@ -866,7 +866,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     if (!bind.isCustomClient() &&
         updateUrl.isNotEmpty &&
         !isCardClosed &&
-        false /* DeskForce: never show RustDesk download/update cards */) {
+        false /* DeskForce: never show stock download/update cards */) {
       final isToUpdate = (isWindows || isMacOS) && bind.mainIsInstalled();
       String btnText = isToUpdate ? 'Update' : 'Download';
       GestureTapCallback onPressed = () async {
@@ -1160,7 +1160,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
           watchIsInputMonitoring = false;
           // Do not notify for now.
           // Monitoring may not take effect until the process is restarted.
-          // rustDeskWinManager.call(
+          // multiWindowManager.call(
           //     WindowType.RemoteDesktop, kWindowDisableGrabKeyboard, '');
           setState(() {});
         }
@@ -1503,7 +1503,7 @@ void setPasswordDialog({VoidCallback? notEmptyCallback}) async {
   });
 }
 
-/// Subtle paper grid — DeskForce station atmosphere (not RustDesk chrome).
+/// Subtle paper grid — DeskForce station atmosphere (not stock upstream chrome).
 class _DeskForcePaperGridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {

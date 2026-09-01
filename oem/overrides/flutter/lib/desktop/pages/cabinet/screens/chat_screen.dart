@@ -26,7 +26,7 @@ class _ChatPeer {
   final String source;
 }
 
-/// Chat / voice hub: computers from your list → open RustDesk session chat/voice.
+/// Chat / voice hub: computers from your list → open DeskForce session chat/voice.
 class CabinetChatScreen extends StatefulWidget {
   const CabinetChatScreen({Key? key}) : super(key: key);
 
