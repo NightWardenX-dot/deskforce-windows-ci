@@ -134,7 +134,7 @@ jobs:
           grep -q "НЕДАВНИЕ" rustdesk/flutter/lib/desktop/pages/deskforce_peer_lists.dart
           grep -q "АДРЕСНАЯ КНИГА" rustdesk/flutter/lib/desktop/pages/deskforce_peer_lists.dart
           grep -q "CabinetAddressBookScreen" rustdesk/flutter/lib/desktop/pages/cabinet/cabinet_page.dart
-          grep -q "_syncRustdeskAbAuth" rustdesk/flutter/lib/desktop/pages/cabinet/cabinet_session.dart
+          grep -q "_syncClientAbAuth" rustdesk/flutter/lib/desktop/pages/cabinet/cabinet_session.dart
           grep -q "0xFF2DD4BF" rustdesk/flutter/lib/desktop/pages/connection_page.dart
           grep -q "DeskForce mobile connect" rustdesk/flutter/lib/mobile/pages/connection_page.dart
           if grep -q "PeerTabPage(" rustdesk/flutter/lib/mobile/pages/connection_page.dart; then echo "mobile PeerTabPage leak"; exit 1; fi
