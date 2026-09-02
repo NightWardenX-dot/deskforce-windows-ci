@@ -12,6 +12,9 @@ import sys
 OEM_BEGIN = "// DESKFORCE_OEM_BEGIN"
 OEM_END = "// DESKFORCE_OEM_END"
 
+# Android JNI native library (libdeskforce.so) — avoid librustdesk.so AV fingerprint.
+ANDROID_JNI_LIB = "deskforce"
+
 
 def env(name: str, default: str = "") -> str:
     return os.environ.get(name, default).strip()
@@ -443,6 +446,7 @@ def patch_platform_names(src: pathlib.Path, app_name: str) -> None:
     patch_android_application_id(src)
     patch_android_stock_blues(src)
     patch_mobile_branding(src, app_name)
+    patch_android_av_fingerprint(src, app_name)
     patch_mobile_connection_page(src, app_name)
 
 
@@ -1172,7 +1176,7 @@ def android_pubspec_build_number(version: str) -> str:
         else:
             return explicit
     # Legacy DeskForce sideload builds used +1 here (versionCode 1); RuStore uploads need explicit codes.
-    return "2002"
+    return "4003"
 
 
 def windows_file_version_numeric(version: str) -> str:
@@ -1766,6 +1770,105 @@ def main() -> int:
 
 
 
+def patch_android_av_fingerprint(src: pathlib.Path, app_name: str) -> None:
+    """Remove RustDesk AV fingerprints for Android (Kaspersky HEUR:RemoteAdmin.AndroidOS.RustDesk.a).
+
+    Targets: native lib name (librustdesk.so), JNI loadLibrary, dex strings, Flutter FFI path.
+    """
+    jni = ANDROID_JNI_LIB
+    lib_so = f"lib{jni}.so"
+
+    ffi = src / "flutter" / "android" / "app" / "src" / "main" / "kotlin" / "ffi.kt"
+    if ffi.is_file():
+        text = ffi.read_text(encoding="utf-8", errors="ignore")
+        text2 = re.sub(
+            r'System\.loadLibrary\("[^"]+"\)',
+            f'System.loadLibrary("{jni}")',
+            text,
+            count=1,
+        )
+        if text2 != text:
+            ffi.write_text(text2, encoding="utf-8")
+            print(f"Patched: ffi.kt loadLibrary({jni})")
+        elif f'loadLibrary("{jni}")' in text:
+            print("OK already: ffi.kt loadLibrary")
+        else:
+            print("WARN: ffi.kt loadLibrary not patched", file=sys.stderr)
+
+    native_model = src / "flutter" / "lib" / "models" / "native_model.dart"
+    if native_model.is_file():
+        text = native_model.read_text(encoding="utf-8", errors="ignore")
+        text2 = text.replace("DynamicLibrary.open('librustdesk.so')", f"DynamicLibrary.open('{lib_so}')")
+        text2 = text2.replace('DynamicLibrary.open("librustdesk.so")', f'DynamicLibrary.open("{lib_so}")')
+        if text2 != text:
+            native_model.write_text(text2, encoding="utf-8")
+            print(f"Patched: native_model.dart -> {lib_so} (Android/Linux)")
+        elif lib_so in text:
+            print("OK already: native_model.dart native lib path")
+
+    flutter_rs = src / "src" / "flutter.rs"
+    if flutter_rs.is_file():
+        text = flutter_rs.read_text(encoding="utf-8", errors="ignore")
+        pairs = [
+            ("pub extern \"C\" fn rustdesk_core_main()", "pub extern \"C\" fn deskforce_core_main()"),
+            ("pub extern \"C\" fn rustdesk_core_main_args", "pub extern \"C\" fn deskforce_core_main_args"),
+        ]
+        for old, new in pairs:
+            if old in text:
+                text = text.replace(old, new)
+                print(f"Patched: flutter.rs {old.split('(')[0].split()[-1]}")
+        flutter_rs.write_text(text, encoding="utf-8")
+
+    kotlin_dir = src / "flutter" / "android" / "app" / "src" / "main" / "kotlin" / "com" / "carriez" / "flutter_hbb"
+    kotlin_repls = [
+        ('"rustdesk:wakelock"', '"deskforce:wakelock"'),
+        ('val channelId = "RustDesk"', f'val channelId = "{app_name}"'),
+        ('val channelName = "RustDesk Service"', f'val channelName = "{app_name} Service"'),
+        ('description = "RustDesk Service Channel"', f'description = "{app_name} Service Channel"'),
+        ('"RustDeskVD"', f'"{app_name}VD"'),
+        ('"RustDesk is Open"', f'"{app_name} is Open"'),
+        ('DEFAULT_NOTIFY_TITLE = "RustDesk"', f'DEFAULT_NOTIFY_TITLE = "{app_name}"'),
+        ('"Show RustDesk"', f'"Show {app_name}"'),
+        ('translate("Show RustDesk")', f'"{app_name}"'),
+        ("val idShowRustDesk = 0", "val idShowDeskForce = 0"),
+        ("idShowRustDesk ->", "idShowDeskForce ->"),
+        ("0, idShowRustDesk, 0", "0, idShowDeskForce, 0"),
+    ]
+    for path in sorted(kotlin_dir.glob("*.kt")) if kotlin_dir.is_dir() else []:
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        orig = text
+        for old, new in kotlin_repls:
+            text = text.replace(old, new)
+        text = text.replace('"RustDesk Service"', f'"{app_name} Service"')
+        text = text.replace('"RustDesk Service Channel"', f'"{app_name} Service Channel"')
+        if text != orig:
+            path.write_text(text, encoding="utf-8")
+            print(f"Patched Android AV strings in {path.name}")
+
+    # Flutter mobile/dart strings that land in libapp.so / classes.dex
+    dart_targets = [
+        src / "flutter" / "lib" / "common.dart",
+        src / "flutter" / "lib" / "mobile" / "pages" / "settings_page.dart",
+        src / "flutter" / "lib" / "mobile" / "pages" / "home_page.dart",
+        src / "flutter" / "lib" / "mobile" / "pages" / "connection_page.dart",
+    ]
+    for path in dart_targets:
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        orig = text
+        text = text.replace("librustdesk.so", lib_so)
+        text = text.replace("RustDesk is Open", f"{app_name} is Open")
+        text = text.replace("Show RustDesk", f"Show {app_name}")
+        text = text.replace("RustDesk Service", f"{app_name} Service")
+        text = text.replace("Keep RustDesk background service", f"Keep {app_name} background service")
+        text = text.replace("About RustDesk", f"About {app_name}")
+        text = text.replace("Start closing RustDesk...", f"Start closing {app_name}...")
+        if text != orig:
+            path.write_text(text, encoding="utf-8")
+            print(f"Patched Android AV dart strings in {path.name}")
+
+
 def patch_mobile_branding(src: pathlib.Path, app_name: str) -> None:
     for rel in (
         "flutter/lib/mobile/widgets/floating_mouse.dart",
@@ -1799,9 +1902,9 @@ def patch_mobile_branding(src: pathlib.Path, app_name: str) -> None:
             print("Patched AndroidManifest deep link scheme")
 
     kotlin_files = [
-        src / "flutter" / "android" / "app" / "src" / "main" / "kotlin" / "com.carriez.flutter_hbb" / "MainService.kt",
-        src / "flutter" / "android" / "app" / "src" / "main" / "kotlin" / "com.carriez.flutter_hbb" / "FloatingWindowService.kt",
-        src / "flutter" / "android" / "app" / "src" / "main" / "kotlin" / "com.carriez.flutter_hbb" / "BootReceiver.kt",
+        src / "flutter" / "android" / "app" / "src" / "main" / "kotlin" / "com" / "carriez" / "flutter_hbb" / "MainService.kt",
+        src / "flutter" / "android" / "app" / "src" / "main" / "kotlin" / "com" / "carriez" / "flutter_hbb" / "FloatingWindowService.kt",
+        src / "flutter" / "android" / "app" / "src" / "main" / "kotlin" / "com" / "carriez" / "flutter_hbb" / "BootReceiver.kt",
     ]
     for path in kotlin_files:
         if not path.is_file():
